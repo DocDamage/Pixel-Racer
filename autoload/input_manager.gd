@@ -122,7 +122,7 @@ func load_bindings() -> void:
 		InputMap.action_erase_events(str(action))
 		for raw in parsed[action]:
 			if raw is Dictionary:
-				var event := _deserialize_event(raw)
+				var event: InputEvent = _deserialize_event(raw)
 				if event != null:
 					InputMap.action_add_event(str(action), event)
 
@@ -135,7 +135,7 @@ func _serialize_event(event: InputEvent) -> Dictionary:
 		return {"type": "joy_axis", "axis": event.axis, "value": event.axis_value}
 	return {}
 
-func _deserialize_event(data: Dictionary):
+func _deserialize_event(data: Dictionary) -> InputEvent:
 	match str(data.get("type", "")):
 		"key":
 			var key := InputEventKey.new()
