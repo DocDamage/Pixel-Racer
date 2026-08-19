@@ -11,9 +11,9 @@ signal width_changed(width_name: String)
 signal selection_changed(rect: Rect2i, active: bool)
 signal clipboard_changed(has_content: bool)
 
-const TOOLS := ["road", "draw_road", "pit", "sand", "dirt", "grass", "start_finish", "checkpoint", "barrier", "erase"]
+const TOOLS := ["road", "draw_road", "pit", "alternate", "sand", "dirt", "grass", "start_finish", "checkpoint", "barrier", "erase"]
 
-var track = null
+var track: TrackData = null
 var renderer: TrackRenderer = null
 var runtime: TrackRuntime = null
 var undo_stack := TrackUndoStack.new()
@@ -37,7 +37,7 @@ var drawing_path := false
 var draw_samples: Array[Vector2i] = []
 var _last_painted := Vector2i(-9999, -9999)
 
-func setup(source_track, source_renderer: TrackRenderer, source_runtime: TrackRuntime, source_camera: Camera2D) -> void:
+func setup(source_track: TrackData, source_renderer: TrackRenderer, source_runtime: TrackRuntime, source_camera: Camera2D) -> void:
 	track = source_track
 	renderer = source_renderer
 	runtime = source_runtime
@@ -56,7 +56,7 @@ func set_enabled(value: bool) -> void:
 		renderer.cursor_visible = value
 		renderer.queue_redraw()
 
-func set_track(source_track) -> void:
+func set_track(source_track: TrackData) -> void:
 	track = source_track
 	undo_stack.clear()
 	clear_selection()
@@ -116,6 +116,32 @@ func selection_rect() -> Rect2i:
 	var max_cell := Vector2i(maxi(selection_start.x, selection_end.x), maxi(selection_start.y, selection_end.y))
 	return Rect2i(min_cell, max_cell - min_cell + Vector2i.ONE)
 
+func selection_road_cells() -> Array[Vector2i]:
+	var output: Array[Vector2i] = []
+	if not selection_active or track == null:
+		return output
+	var rect := selection_rect()
+	for y in range(rect.position.y, rect.end.y):
+		for x in range(rect.position.x, rect.end.x):
+			var cell := Vector2i(x, y)
+			if track.has_road(cell):
+				output.append(cell)
+	return output
+
+func assign_selection_route(route_id: String) -> int:
+	var cells := selection_road_cells()
+	if cells.is_empty():
+		return 0
+	undo_stack.record_before(track)
+	var changed := 0
+	match route_id:
+		"main": changed = route_ops.restore_main_route(track, cells)
+		"pit": changed = route_ops.mark_pit_lane(track, cells)
+		_: changed = route_ops.mark_alternate_route(track, cells, route_id, false)
+	if changed > 0:
+		_after_edit()
+	return changed
+
 func copy_selection() -> void:
 	if not selection_active or track == null:
 		return
@@ -174,6 +200,11 @@ func eyedropper() -> void:
 	if tool == "road":
 		road_width = str(track.get_road(cursor_cell).get("width", "standard"))
 		width_changed.emit(road_width)
+		var route_id := track.get_route_id(cursor_cell)
+		if route_id == "pit":
+			tool = "pit"
+		elif route_id != "main" and not route_id.is_empty():
+			tool = "alternate"
 	if tool in TOOLS:
 		set_tool(tool)
 
@@ -216,7 +247,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			var sampled := _clamp_cell(cursor_cell)
 			if draw_samples.is_empty() or draw_samples.back() != sampled:
 				draw_samples.append(sampled)
-		elif paint_held and cursor_cell != _last_painted and current_tool() in ["road", "pit", "sand", "dirt", "grass", "erase"]:
+		elif paint_held and cursor_cell != _last_painted and current_tool() in ["road", "pit", "alternate", "sand", "dirt", "grass", "erase"]:
 			_place_current()
 	elif event is InputEventMouseButton:
 		var mouse := event as InputEventMouseButton
@@ -260,6 +291,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				KEY_C: copy_selection()
 				KEY_X: cut_selection()
 				KEY_V: paste_clipboard()
+				KEY_1: assign_selection_route("main")
+				KEY_2: assign_selection_route("pit")
+				KEY_3: assign_selection_route("alternate")
 				_: pass
 			return
 		match key.physical_keycode:
@@ -273,6 +307,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_8: set_tool("checkpoint")
 			KEY_9: set_tool("barrier")
 			KEY_0: set_tool("erase")
+			KEY_B: set_tool("alternate")
 			KEY_X: eyedropper()
 			KEY_R: rotate_clipboard()
 			KEY_M: mirror_clipboard()
@@ -306,6 +341,9 @@ func _place_current() -> void:
 		"pit":
 			track.set_road(cursor_cell, "asphalt", road_width)
 			route_ops.mark_pit_lane(track, [cursor_cell])
+		"alternate":
+			track.set_road(cursor_cell, "asphalt", road_width)
+			route_ops.mark_alternate_route(track, [cursor_cell], "alternate", false)
 		"sand": track.set_terrain(cursor_cell, "sand")
 		"dirt": track.set_terrain(cursor_cell, "dirt")
 		"grass": track.set_terrain(cursor_cell, "grass")
