@@ -16,11 +16,13 @@ func emit_impact(world_position: Vector2, normal: Vector2, intensity: float) -> 
 	var strength := clampf(intensity, 0.0, 1.0)
 	if strength <= 0.01:
 		return
+	var flash_scale: float = clampf(float(SettingsManager.get_value("flash_intensity", 1.0)), 0.0, 1.0)
 	var away := normal.normalized() if normal.length_squared() > 0.001 else Vector2.UP
-	var spark_count := clampi(3 + roundi(strength * 10.0), 3, 13)
+	if flash_scale > 0.02:
+		var spark_count := clampi(1 + roundi(strength * flash_scale * 10.0), 1, 12)
+		for _i in range(spark_count):
+			_spawn_spark(world_position, away, strength, flash_scale)
 	var debris_count := clampi(roundi(strength * 5.0), 1, 5)
-	for _i in range(spark_count):
-		_spawn_spark(world_position, away, strength)
 	for _i in range(debris_count):
 		_spawn_debris(world_position, away, strength)
 	_trim_pool()
@@ -60,12 +62,13 @@ func _draw() -> void:
 			var size := float(particle.get("size", 2.0))
 			draw_rect(Rect2(position - Vector2.ONE * size * 0.5, Vector2.ONE * size), Color(DEBRIS_COLOR, alpha), true)
 		else:
+			alpha *= clampf(float(particle.get("flash_scale", 1.0)), 0.0, 1.0)
 			var tail := velocity.normalized() * float(particle.get("length", 5.0))
 			var color := HOT_COLOR.lerp(SPARK_COLOR, alpha)
 			color.a = alpha
 			draw_line(position, position - tail, color, maxf(1.0, float(particle.get("width", 1.0))))
 
-func _spawn_spark(origin: Vector2, away: Vector2, strength: float) -> void:
+func _spawn_spark(origin: Vector2, away: Vector2, strength: float, flash_scale: float) -> void:
 	var direction := away.rotated(randf_range(-1.25, 1.25)).normalized()
 	var speed := randf_range(85.0, 175.0 + 135.0 * strength)
 	var life := randf_range(0.14, 0.28 + 0.12 * strength)
@@ -76,7 +79,8 @@ func _spawn_spark(origin: Vector2, away: Vector2, strength: float) -> void:
 		"life": life,
 		"max_life": life,
 		"length": randf_range(3.0, 7.0 + strength * 5.0),
-		"width": 1.0 if strength < 0.65 else 2.0
+		"width": 1.0 if strength < 0.65 else 2.0,
+		"flash_scale": flash_scale
 	})
 
 func _spawn_debris(origin: Vector2, away: Vector2, strength: float) -> void:
