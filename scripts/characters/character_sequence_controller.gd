@@ -18,11 +18,14 @@ var _step_index: int = -1
 var _waiting_for_arrival: bool = false
 var _waiting_until_msec: int = 0
 var _active: bool = false
+var _base_walk_speed: float = 72.0
 
 func setup(character_actor: CharacterActor, venue_controller: VenueController, dialogue_manager: DialogueManager = null) -> void:
 	actor = character_actor
 	venue = venue_controller
 	dialogue = dialogue_manager
+	if actor != null and actor.definition != null:
+		_base_walk_speed = actor.definition.walk_speed
 	if actor != null and not actor.destination_reached.is_connected(_on_actor_destination_reached):
 		actor.destination_reached.connect(_on_actor_destination_reached)
 
@@ -39,6 +42,8 @@ func play(sequence_id: String, steps: Array[Dictionary], lock_input: bool = true
 	if actor == null or venue == null or steps.is_empty():
 		return false
 	cancel(false)
+	if actor.definition != null:
+		_base_walk_speed = actor.definition.walk_speed
 	_sequence_id = sequence_id
 	_steps = steps.duplicate(true)
 	_step_index = -1
@@ -65,16 +70,18 @@ func skip() -> void:
 			var step: Dictionary = _steps[index]
 			if str(step.get("type", "")) != "walk":
 				continue
-			var anchor_name := StringName(str(step.get("anchor", "")))
+			var anchor_name: StringName = StringName(str(step.get("anchor", "")))
 			if venue != null and venue.has_anchor(anchor_name):
 				actor.teleport_to(venue.anchor_position(anchor_name))
 		actor.stop()
+	_restore_walk_speed()
 	_finish_sequence()
 	sequence_skipped.emit(skipped_id)
 
 func cancel(stop_actor: bool = true) -> void:
 	if stop_actor and actor != null:
 		actor.stop()
+	_restore_walk_speed()
 	_sequence_id = ""
 	_steps.clear()
 	_step_index = -1
@@ -123,20 +130,19 @@ func _run_walk_step(step: Dictionary) -> void:
 	if actor == null or venue == null:
 		_advance_step()
 		return
-	var anchor_name := StringName(str(step.get("anchor", "")))
+	var anchor_name: StringName = StringName(str(step.get("anchor", "")))
 	if not venue.has_anchor(anchor_name):
 		_advance_step()
 		return
-	var old_speed: float = actor.definition.walk_speed if actor.definition != null else 72.0
 	var step_speed_scale: float = maxf(0.1, float(step.get("speed_scale", 1.0)))
 	if actor.definition != null:
-		actor.definition.walk_speed = old_speed * speed_multiplier * step_speed_scale
+		actor.definition.walk_speed = _base_walk_speed * speed_multiplier * step_speed_scale
 	_waiting_for_arrival = true
 	actor.walk_to(venue.anchor_position(anchor_name))
 
 func _run_face_step(step: Dictionary) -> void:
 	if actor != null and venue != null:
-		var anchor_name := StringName(str(step.get("anchor", "")))
+		var anchor_name: StringName = StringName(str(step.get("anchor", "")))
 		if venue.has_anchor(anchor_name):
 			actor.face_toward(venue.anchor_position(anchor_name))
 	_advance_step()
@@ -171,9 +177,15 @@ func _on_actor_destination_reached(_destination: Vector2) -> void:
 	if not _active or not _waiting_for_arrival:
 		return
 	_waiting_for_arrival = false
+	_restore_walk_speed()
 	_advance_step()
 
+func _restore_walk_speed() -> void:
+	if actor != null and actor.definition != null:
+		actor.definition.walk_speed = _base_walk_speed
+
 func _finish_sequence() -> void:
+	_restore_walk_speed()
 	var completed_id: String = _sequence_id
 	_sequence_id = ""
 	_steps.clear()
