@@ -136,6 +136,8 @@ func _complete_lap() -> void:
 	_start_armed = false
 	last_lap = current_lap_time()
 	best_lap = minf(best_lap, last_lap)
+	if track != null and vehicle != null:
+		RecordManager.new().record_lap(track.track_id, vehicle.vehicle_id, mode, last_lap)
 	lap_completed.emit(current_lap, last_lap)
 	if current_lap >= laps_required:
 		_finish_event()
@@ -148,6 +150,8 @@ func _complete_lap() -> void:
 
 func _finish_event() -> void:
 	last_lap = current_lap_time()
+	if mode == "drift" and track != null and vehicle != null:
+		RecordManager.new().record_score(track.track_id, vehicle.vehicle_id, mode, vehicle.drift_score)
 	finished = true
 	running = false
 	race_finished.emit(total_time())

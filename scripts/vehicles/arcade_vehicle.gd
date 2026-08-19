@@ -25,6 +25,7 @@ var current_surface := "asphalt"
 var sprite: Sprite2D
 var collision_shape: CollisionShape2D
 var vfx: VehicleVFX
+var skid_marks: SkidMarkManager
 var is_drifting := false
 var is_boosting := false
 var frame_width := 46
@@ -43,13 +44,20 @@ func _ready() -> void:
 	vfx = VehicleVFX.new()
 	vfx.name = "VehicleVFX"
 	add_child(vfx)
+	_ensure_skid_manager()
 
 func setup(source_track, id: String, player_controlled: bool = true, color: String = "default") -> void:
 	track = source_track
 	vehicle_id = id
 	input_enabled = player_controlled
 	var catalog := VehicleCatalog.new()
-	definition = catalog.get_vehicle(vehicle_id)
+	if player_controlled:
+		var garage := GarageManager.new()
+		definition = garage.effective_definition(vehicle_id)
+		if color == "default":
+			color = garage.selected_color(vehicle_id)
+	else:
+		definition = catalog.get_vehicle(vehicle_id)
 	frame_width = int(definition.get("grid_width", 46))
 	frame_height = int(definition.get("grid_height", 54))
 	var texture := load(catalog.sprite_path(vehicle_id, color)) as Texture2D
@@ -85,6 +93,7 @@ func _physics_process(delta: float) -> void:
 		return
 	var controls := _read_controls()
 	var stats: Dictionary = definition.get("stats", {})
+	var tuning: Dictionary = definition.get("tuning", {})
 	var surface_data: Dictionary = SURFACES.get(current_surface, SURFACES["asphalt"])
 	var forward := Vector2.UP.rotated(heading)
 	var right := forward.rotated(PI * 0.5)
@@ -95,10 +104,11 @@ func _physics_process(delta: float) -> void:
 	var handling_stat := float(stats.get("handling", 80)) / 100.0
 	var drift_stat := float(stats.get("drift", 80)) / 100.0
 	var boost_stat := float(stats.get("boost", 80)) / 100.0
-	var max_speed := lerpf(250.0, 520.0, speed_stat) * float(surface_data["speed"])
-	var engine_power := lerpf(210.0, 480.0, accel_stat)
-	var brake_power := lerpf(360.0, 620.0, handling_stat)
-	var steering_rate := lerpf(1.65, 2.9, handling_stat) * float(SettingsManager.get_value("steering_sensitivity", 1.0))
+	var final_drive := float(tuning.get("final_drive", 1.0))
+	var max_speed := lerpf(250.0, 520.0, speed_stat) * float(surface_data["speed"]) * final_drive
+	var engine_power := lerpf(210.0, 480.0, accel_stat) / maxf(0.85, final_drive)
+	var brake_power := lerpf(360.0, 620.0, handling_stat) * float(tuning.get("brake_bias", 1.0))
+	var steering_rate := lerpf(1.65, 2.9, handling_stat) * float(SettingsManager.get_value("steering_sensitivity", 1.0)) * float(tuning.get("steering", 1.0))
 	if bool(SettingsManager.get_value("auto_accelerate", false)) and float(controls["throttle"]) <= 0.0:
 		controls["throttle"] = 1.0
 	forward_speed += float(controls["throttle"]) * engine_power * delta
@@ -110,9 +120,10 @@ func _physics_process(delta: float) -> void:
 	var resistance := float(surface_data["resistance"])
 	forward_speed = move_toward(forward_speed, 0.0, (18.0 + absf(forward_speed) * resistance) * delta)
 	var is_handbrake := bool(controls["handbrake"])
-	var grip := lerpf(4.4, 9.5, handling_stat) * float(surface_data["grip"])
+	var grip := lerpf(4.4, 9.5, handling_stat) * float(surface_data["grip"]) * float(tuning.get("grip_bias", 1.0))
 	if is_handbrake:
-		grip *= lerpf(0.26, 0.50, drift_stat)
+		var drift_assist := float(tuning.get("drift_assist", 0.5))
+		grip *= lerpf(0.22, 0.52, drift_stat) * lerpf(0.82, 1.12, drift_assist)
 	elif bool(SettingsManager.get_value("traction_assist", true)):
 		grip *= 1.12
 	lateral_speed = move_toward(lateral_speed, 0.0, absf(lateral_speed) * grip * delta)
@@ -135,6 +146,8 @@ func _physics_process(delta: float) -> void:
 	_update_drift(delta, forward_speed, lateral_speed)
 	if vfx != null:
 		vfx.update_state(delta, heading, is_drifting, is_boosting, velocity.length())
+	if is_drifting and skid_marks != null:
+		skid_marks.record_vehicle(get_instance_id(), global_position, heading, frame_width * 0.16, clampf(absf(lateral_speed) / 70.0, 0.35, 1.0))
 	_update_sprite_frame()
 	if input_enabled and Input.is_action_just_pressed("reset_vehicle"):
 		reset_to_last_valid()
@@ -175,3 +188,14 @@ func _update_sprite_frame() -> void:
 	var normalized := fposmod(heading, TAU)
 	var frame := posmod(roundi(normalized / TAU * 16.0), 16)
 	sprite.region_rect = Rect2(frame * frame_width, 0, frame_width, frame_height)
+
+func _ensure_skid_manager() -> void:
+	var existing := get_tree().get_first_node_in_group("skid_mark_manager")
+	if existing is SkidMarkManager:
+		skid_marks = existing
+		return
+	if get_tree().current_scene == null:
+		return
+	skid_marks = SkidMarkManager.new()
+	skid_marks.name = "SkidMarkManager"
+	get_tree().current_scene.add_child(skid_marks)
