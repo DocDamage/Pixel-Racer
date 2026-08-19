@@ -6,12 +6,8 @@ const NORTH := 1
 const EAST := 2
 const SOUTH := 4
 const WEST := 8
-const DIRECTIONS := {
-	NORTH: Vector2i.UP,
-	EAST: Vector2i.RIGHT,
-	SOUTH: Vector2i.DOWN,
-	WEST: Vector2i.LEFT
-}
+const DIRECTIONS := {NORTH: Vector2i.UP, EAST: Vector2i.RIGHT, SOUTH: Vector2i.DOWN, WEST: Vector2i.LEFT}
+const DRIVEABLE_SURFACES := ["asphalt", "dirt", "sand", "gravel"]
 
 var schema_version: int = SCHEMA_VERSION
 var track_id: String = ""
@@ -25,12 +21,7 @@ var road_tiles: Dictionary = {}
 var objects: Array[Dictionary] = []
 var race_objects: Array[Dictionary] = []
 var event_presets: Array[Dictionary] = []
-var metadata: Dictionary = {
-	"length": 0.0,
-	"difficulty": 1,
-	"created_at": "",
-	"updated_at": ""
-}
+var metadata: Dictionary = {"length": 0.0, "difficulty": 1, "created_at": "", "updated_at": ""}
 var dirty: bool = false
 
 func _init() -> void:
@@ -53,15 +44,41 @@ func set_road(cell: Vector2i, surface: String = "asphalt", road_width: String = 
 	if not in_bounds(cell):
 		return false
 	var key := _key(cell)
-	road_tiles[key] = {
-		"x": cell.x,
-		"y": cell.y,
-		"type": surface,
-		"connection_mask": int(road_tiles.get(key, {}).get("connection_mask", 0)),
-		"variant": int(road_tiles.get(key, {}).get("variant", 0)),
-		"width": road_width
-	}
+	var previous: Dictionary = road_tiles.get(key, {})
+	var item := previous.duplicate(true)
+	item["x"] = cell.x
+	item["y"] = cell.y
+	item["type"] = surface if surface in DRIVEABLE_SURFACES else "asphalt"
+	item["connection_mask"] = int(previous.get("connection_mask", 0))
+	item["variant"] = int(previous.get("variant", 0))
+	item["width"] = road_width
+	if not item.has("route_id"):
+		item["route_id"] = "main"
+	road_tiles[key] = item
 	_recalculate_around(cell)
+	dirty = true
+	return true
+
+func set_road_surface(cell: Vector2i, surface: String) -> bool:
+	if not has_road(cell) or surface not in DRIVEABLE_SURFACES:
+		return false
+	road_tiles[_key(cell)]["type"] = surface
+	dirty = true
+	return true
+
+func set_road_width(cell: Vector2i, road_width: String) -> bool:
+	if not has_road(cell) or road_width not in ["narrow", "standard", "wide", "extra_wide"]:
+		return false
+	road_tiles[_key(cell)]["width"] = road_width
+	dirty = true
+	return true
+
+func set_road_metadata(cell: Vector2i, values: Dictionary) -> bool:
+	if not has_road(cell):
+		return false
+	for key in values:
+		if key not in ["x", "y", "connection_mask"]:
+			road_tiles[_key(cell)][key] = values[key]
 	dirty = true
 	return true
 
@@ -77,6 +94,8 @@ func remove_road(cell: Vector2i) -> bool:
 func set_terrain(cell: Vector2i, surface: String) -> bool:
 	if not in_bounds(cell):
 		return false
+	if has_road(cell) and surface in ["dirt", "sand", "gravel"]:
+		return set_road_surface(cell, surface)
 	var key := _key(cell)
 	if surface == "grass":
 		terrain.erase(key)
@@ -91,13 +110,7 @@ func get_surface_at(cell: Vector2i) -> String:
 	return str(terrain.get(_key(cell), {}).get("type", "grass"))
 
 func add_object(type: String, cell: Vector2i, rotation_steps: int = 0, extra: Dictionary = {}) -> Dictionary:
-	var item := {
-		"id": _new_id(),
-		"type": type,
-		"x": cell.x,
-		"y": cell.y,
-		"rotation_steps": posmod(rotation_steps, 4)
-	}
+	var item := {"id": _new_id(), "type": type, "x": cell.x, "y": cell.y, "rotation_steps": posmod(rotation_steps, 4)}
 	item.merge(extra, true)
 	objects.append(item)
 	dirty = true
@@ -119,13 +132,7 @@ func place_race_object(type: String, cell: Vector2i, sequence_index: int = -1) -
 		for index in range(race_objects.size() - 1, -1, -1):
 			if str(race_objects[index].get("type", "")) == "start_finish":
 				race_objects.remove_at(index)
-	var item := {
-		"id": _new_id(),
-		"type": type,
-		"x": cell.x,
-		"y": cell.y,
-		"sequence_index": sequence_index
-	}
+	var item := {"id": _new_id(), "type": type, "x": cell.x, "y": cell.y, "sequence_index": sequence_index}
 	race_objects.append(item)
 	dirty = true
 	return item
@@ -157,9 +164,7 @@ func get_checkpoints_sorted() -> Array[Dictionary]:
 	for item in race_objects:
 		if str(item.get("type", "")) == "checkpoint":
 			checkpoints.append(item)
-	checkpoints.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return int(a.get("sequence_index", 0)) < int(b.get("sequence_index", 0))
-	)
+	checkpoints.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("sequence_index", 0)) < int(b.get("sequence_index", 0)))
 	return checkpoints
 
 func road_cells() -> Array[Vector2i]:
@@ -192,21 +197,7 @@ func to_dict() -> Dictionary:
 	var road_array: Array = []
 	for key in road_tiles:
 		road_array.append(road_tiles[key].duplicate(true))
-	return {
-		"schema_version": schema_version,
-		"track_id": track_id,
-		"name": name,
-		"author": author,
-		"width": width,
-		"height": height,
-		"cell_size": cell_size,
-		"terrain": terrain_array,
-		"road_tiles": road_array,
-		"objects": objects.duplicate(true),
-		"race_objects": race_objects.duplicate(true),
-		"event_presets": event_presets.duplicate(true),
-		"metadata": metadata.duplicate(true)
-	}
+	return {"schema_version": schema_version, "track_id": track_id, "name": name, "author": author, "width": width, "height": height, "cell_size": cell_size, "terrain": terrain_array, "road_tiles": road_array, "objects": objects.duplicate(true), "race_objects": race_objects.duplicate(true), "event_presets": event_presets.duplicate(true), "metadata": metadata.duplicate(true)}
 
 func from_dict(data: Dictionary) -> void:
 	schema_version = int(data.get("schema_version", SCHEMA_VERSION))
@@ -225,7 +216,12 @@ func from_dict(data: Dictionary) -> void:
 	for raw in data.get("road_tiles", []):
 		if raw is Dictionary:
 			var cell := Vector2i(int(raw.get("x", 0)), int(raw.get("y", 0)))
-			road_tiles[_key(cell)] = raw.duplicate(true)
+			var road := raw.duplicate(true)
+			if not road.has("width"):
+				road["width"] = "standard"
+			if not road.has("route_id"):
+				road["route_id"] = "main"
+			road_tiles[_key(cell)] = road
 	objects = _typed_dictionary_array(data.get("objects", []))
 	race_objects = _typed_dictionary_array(data.get("race_objects", []))
 	event_presets = _typed_dictionary_array(data.get("event_presets", []))
