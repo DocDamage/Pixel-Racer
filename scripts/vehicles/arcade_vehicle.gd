@@ -166,12 +166,12 @@ func _physics_process(delta: float) -> void:
 	if get_slide_collision_count() > 0:
 		var impact_strength: float = clampf(pre_collision_speed / 420.0, 0.15, 1.0)
 		var slide_collision: KinematicCollision2D = get_slide_collision(0)
-		if collision_fx != null and slide_collision != null:
-			collision_fx.emit_impact(global_position, slide_collision.get_normal(), impact_strength)
-		if audio != null:
-			audio.trigger_impact(impact_strength)
 		velocity *= 0.68
 		if _collision_rumble_cooldown <= 0.0:
+			if collision_fx != null and slide_collision != null:
+				collision_fx.emit_impact(global_position, slide_collision.get_normal(), impact_strength)
+			if audio != null:
+				audio.trigger_impact(impact_strength)
 			_rumble(0.52, 0.22)
 			_collision_rumble_cooldown = 0.28
 	_update_surface()
