@@ -11,6 +11,7 @@ func _init() -> void:
 	_test_surface_painting()
 	_test_serialization_round_trip()
 	_test_validation()
+	_test_route_semantics()
 	_test_builder_clipboard()
 	_test_draw_track_tool()
 	_test_rating_and_preview()
@@ -57,6 +58,7 @@ func _test_serialization_round_trip() -> void:
 	_expect(loaded.name == source.name, "track name survives round-trip")
 	_expect(loaded.road_tiles.size() == source.road_tiles.size(), "roads survive round-trip")
 	_expect(loaded.get_checkpoints_sorted().size() == 3, "checkpoints survive round-trip")
+	_expect(loaded.route_ids().has("main"), "route metadata survives migration")
 
 func _test_validation() -> void:
 	var track := ProceduralTrackGenerator.new().create_demo_track()
@@ -65,6 +67,35 @@ func _test_validation() -> void:
 	track.remove_road(Vector2i(6, 8))
 	result = TrackValidator.new().validate(track)
 	_expect(not bool(result["raceable"]), "broken loop is rejected")
+
+func _test_route_semantics() -> void:
+	var track := ProceduralTrackGenerator.new().create_demo_track()
+	var pit_cells: Array[Vector2i] = [
+		Vector2i(10, 19), Vector2i(10, 18), Vector2i(11, 18), Vector2i(12, 18),
+		Vector2i(13, 18), Vector2i(14, 18), Vector2i(15, 18), Vector2i(15, 19)
+	]
+	for cell in pit_cells:
+		track.set_road(cell, "asphalt", "narrow")
+	var route_ops := RouteOps.new()
+	_expect(route_ops.mark_pit_lane(track, pit_cells, 90.0) == pit_cells.size(), "pit tool assigns all bypass cells")
+	var summary := route_ops.route_summary(track, "pit")
+	_expect(bool(summary.get("simple_path", false)), "pit bypass is a simple route path")
+	_expect(Array(summary.get("interfaces", [])).size() == 2, "pit bypass has exactly two main-route interfaces")
+	var result := TrackValidator.new().validate(track)
+	_expect(bool(result["raceable"]), "well-formed pit bypass keeps official circuit valid")
+	var start := track.get_start_object()
+	var start_cell := Vector2i(int(start.get("x", 0)), int(start.get("y", 0)))
+	var main_graph := TrackGraph.new()
+	main_graph.build(track, "main")
+	_expect(main_graph.is_single_loop(start_cell), "AI/main graph ignores optional bypass branches")
+	var encoded := track.to_dict()
+	var loaded := TrackData.new()
+	loaded.from_dict(encoded)
+	_expect(str(loaded.route_definition("pit").get("type", "")) == "pit", "pit route definition survives serialization")
+	_expect(float(loaded.route_definition("pit").get("speed_limit", 0.0)) == 90.0, "pit speed limit survives serialization")
+	track.remove_road(Vector2i(12, 18))
+	result = TrackValidator.new().validate(track)
+	_expect(not bool(result["raceable"]), "broken optional bypass is rejected")
 
 func _test_builder_clipboard() -> void:
 	var track := TrackData.new()
