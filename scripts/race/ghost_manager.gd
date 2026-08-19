@@ -3,12 +3,14 @@ class_name GhostManager
 
 const GHOST_ROOT := "user://ghosts"
 const GHOST_SCHEMA := 1
+const BACKUP_SUFFIX := ".bak"
+const TEMP_SUFFIX := ".tmp"
 
 func best_ghost_path(track_id: String, vehicle_id: String, mode: String = "time_trial") -> String:
 	return GHOST_ROOT.path_join(_safe(track_id)).path_join("%s_%s.json" % [_safe(vehicle_id), _safe(mode)])
 
 func best_ghost_exists(track_id: String, vehicle_id: String, mode: String = "time_trial") -> bool:
-	return FileAccess.file_exists(best_ghost_path(track_id, vehicle_id, mode))
+	return not load_payload(best_ghost_path(track_id, vehicle_id, mode)).is_empty()
 
 func best_ghost_time(track_id: String, vehicle_id: String, mode: String = "time_trial") -> float:
 	var payload := load_payload(best_ghost_path(track_id, vehicle_id, mode))
@@ -46,31 +48,41 @@ func save_if_best(track_id: String, vehicle_id: String, mode: String, lap_time: 
 	return _atomic_write_json(path, payload)
 
 func load_recorder(track_id: String, vehicle_id: String, mode: String = "time_trial") -> GhostRecorder:
-	var recorder := GhostRecorder.new()
-	if not recorder.load_from(best_ghost_path(track_id, vehicle_id, mode)):
+	var payload: Dictionary = load_payload(best_ghost_path(track_id, vehicle_id, mode))
+	if payload.is_empty():
 		return null
-	return recorder
+	var recorder := GhostRecorder.new()
+	var raw_samples: Variant = payload.get("samples", [])
+	if not raw_samples is Array:
+		return null
+	for raw_sample in raw_samples as Array:
+		if raw_sample is Dictionary:
+			recorder.samples.append((raw_sample as Dictionary).duplicate(true))
+	return recorder if recorder.samples.size() >= 2 else null
 
 func load_payload(path: String) -> Dictionary:
-	if not FileAccess.file_exists(path):
+	var payload: Dictionary = _parse_payload(path)
+	if not payload.is_empty():
+		return payload
+	if not path.ends_with(".json"):
 		return {}
-	var file := FileAccess.open(path, FileAccess.READ)
-	if file == null:
-		return {}
-	var parsed = JSON.parse_string(file.get_as_text())
-	if not parsed is Dictionary:
-		return {}
-	if int(parsed.get("schema_version", -1)) != GHOST_SCHEMA:
-		return {}
-	if not parsed.get("samples", []) is Array:
-		return {}
-	return parsed
+	payload = _parse_payload("%s%s" % [path, TEMP_SUFFIX])
+	if not payload.is_empty():
+		_mark_recovery(payload, "temporary_save")
+		return payload
+	payload = _parse_payload("%s%s" % [path, BACKUP_SUFFIX])
+	if not payload.is_empty():
+		_mark_recovery(payload, "backup")
+		return payload
+	return {}
 
 func delete_best(track_id: String, vehicle_id: String, mode: String = "time_trial") -> bool:
 	var path := best_ghost_path(track_id, vehicle_id, mode)
-	if not FileAccess.file_exists(path):
-		return false
-	return DirAccess.remove_absolute(ProjectSettings.globalize_path(path)) == OK
+	var removed := false
+	for candidate in [path, "%s%s" % [path, TEMP_SUFFIX], "%s%s" % [path, BACKUP_SUFFIX]]:
+		if FileAccess.file_exists(candidate):
+			removed = DirAccess.remove_absolute(ProjectSettings.globalize_path(candidate)) == OK or removed
+	return removed
 
 func records_for_track(track_id: String) -> Array[Dictionary]:
 	var output: Array[Dictionary] = []
@@ -94,15 +106,70 @@ func records_for_track(track_id: String) -> Array[Dictionary]:
 	return output
 
 func _atomic_write_json(path: String, payload: Dictionary) -> bool:
-	var temp_path := "%s.tmp" % path
+	var temp_path := "%s%s" % [path, TEMP_SUFFIX]
+	var backup_path := "%s%s" % [path, BACKUP_SUFFIX]
 	var file := FileAccess.open(temp_path, FileAccess.WRITE)
 	if file == null:
 		return false
 	file.store_string(JSON.stringify(payload, "\t"))
+	file.flush()
 	file.close()
+	if _parse_payload(temp_path).is_empty():
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(temp_path))
+		return false
 	if FileAccess.file_exists(path):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
-	return DirAccess.rename_absolute(ProjectSettings.globalize_path(temp_path), ProjectSettings.globalize_path(path)) == OK
+		if not _replace_backup(path, backup_path):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(temp_path))
+			return false
+		if DirAccess.remove_absolute(ProjectSettings.globalize_path(path)) != OK:
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(temp_path))
+			return false
+	var error := DirAccess.rename_absolute(ProjectSettings.globalize_path(temp_path), ProjectSettings.globalize_path(path))
+	if error == OK:
+		return true
+	if not FileAccess.file_exists(path) and FileAccess.file_exists(backup_path):
+		DirAccess.copy_absolute(ProjectSettings.globalize_path(backup_path), ProjectSettings.globalize_path(path))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(temp_path))
+	return false
+
+func _replace_backup(path: String, backup_path: String) -> bool:
+	if _parse_payload(path).is_empty():
+		return true
+	var absolute_backup := ProjectSettings.globalize_path(backup_path)
+	if FileAccess.file_exists(backup_path):
+		if DirAccess.remove_absolute(absolute_backup) != OK:
+			return false
+	return DirAccess.copy_absolute(ProjectSettings.globalize_path(path), absolute_backup) == OK
+
+func _parse_payload(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
+		return {}
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return {}
+	var parsed: Variant = JSON.parse_string(file.get_as_text())
+	file.close()
+	if not parsed is Dictionary:
+		return {}
+	var payload: Dictionary = parsed as Dictionary
+	if int(payload.get("schema_version", -1)) != GHOST_SCHEMA:
+		return {}
+	var raw_samples: Variant = payload.get("samples", [])
+	if not raw_samples is Array or (raw_samples as Array).size() < 2:
+		return {}
+	var raw_metadata: Variant = payload.get("metadata", {})
+	if not raw_metadata is Dictionary:
+		return {}
+	return payload
+
+func _mark_recovery(payload: Dictionary, source: String) -> void:
+	var raw_metadata: Variant = payload.get("metadata", {})
+	if not raw_metadata is Dictionary:
+		return
+	var metadata: Dictionary = raw_metadata as Dictionary
+	metadata["recovered_from"] = source
+	metadata["recovered_at"] = Time.get_datetime_string_from_system(true)
+	payload["metadata"] = metadata
 
 func _safe(value: String) -> String:
 	var output := value.strip_edges().to_lower().replace(" ", "_")
