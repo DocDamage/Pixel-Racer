@@ -12,7 +12,13 @@ var position_label: Label
 var list_label: Label
 var catalog := VehicleCatalog.new()
 
+func _ready() -> void:
+	if game == null:
+		setup(get_parent())
+
 func setup(game_root) -> void:
+	if panel != null:
+		return
 	game = game_root
 	layer = 24
 	_build()
@@ -40,7 +46,7 @@ func _process(_delta: float) -> void:
 			display_name = display_name.left(18)
 		var prefix := ">" if id == game.player.vehicle_id and int(item.get("position", 0)) == position else " "
 		var suffix := " FIN" if bool(item.get("finished", false)) else " L%d" % maxi(0, int(item.get("lap", 1)))
-		lines.append("%s%d  %-18s%s" % [prefix, int(item.get("position", 0)), display_name, suffix])
+		lines.append("%s%d  %s%s" % [prefix, int(item.get("position", 0)), display_name, suffix])
 	list_label.text = "\n".join(lines)
 
 func _build() -> void:
