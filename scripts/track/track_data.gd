@@ -8,6 +8,7 @@ const SOUTH := 4
 const WEST := 8
 const DIRECTIONS := {NORTH: Vector2i.UP, EAST: Vector2i.RIGHT, SOUTH: Vector2i.DOWN, WEST: Vector2i.LEFT}
 const DRIVEABLE_SURFACES := ["asphalt", "dirt", "sand", "gravel"]
+const ROAD_WIDTHS := ["narrow", "standard", "wide", "extra_wide"]
 
 var schema_version: int = SCHEMA_VERSION
 var track_id: String = ""
@@ -21,12 +22,21 @@ var road_tiles: Dictionary = {}
 var objects: Array[Dictionary] = []
 var race_objects: Array[Dictionary] = []
 var event_presets: Array[Dictionary] = []
-var metadata: Dictionary = {"length": 0.0, "difficulty": 1, "created_at": "", "updated_at": ""}
+var metadata: Dictionary = {
+	"length": 0.0,
+	"difficulty": 1,
+	"created_at": "",
+	"updated_at": "",
+	"routes": {
+		"main": {"id": "main", "type": "main", "parent": "", "preferred": true, "legal": true}
+	}
+}
 var dirty: bool = false
 
 func _init() -> void:
 	if track_id.is_empty():
 		track_id = _new_id()
+	_ensure_default_routes()
 
 func in_bounds(cell: Vector2i) -> bool:
 	return cell.x >= 0 and cell.y >= 0 and cell.x < width and cell.y < height
@@ -40,21 +50,97 @@ func get_road(cell: Vector2i) -> Dictionary:
 func get_road_mask(cell: Vector2i) -> int:
 	return int(get_road(cell).get("connection_mask", 0))
 
+func get_route_id(cell: Vector2i) -> String:
+	if not has_road(cell):
+		return ""
+	return str(get_road(cell).get("route_id", "main"))
+
+func get_route_cells(route_id: String) -> Array[Vector2i]:
+	var output: Array[Vector2i] = []
+	for cell in road_cells():
+		if get_route_id(cell) == route_id:
+			output.append(cell)
+	return output
+
+func route_ids() -> Array[String]:
+	var seen: Dictionary = {}
+	seen["main"] = true
+	for cell in road_cells():
+		seen[get_route_id(cell)] = true
+	var routes_value = metadata.get("routes", {})
+	if routes_value is Dictionary:
+		for route_id in routes_value:
+			seen[str(route_id)] = true
+	var output: Array[String] = []
+	for route_id in seen:
+		if not str(route_id).is_empty():
+			output.append(str(route_id))
+	output.sort()
+	var main_index := output.find("main")
+	if main_index > 0:
+		output.remove_at(main_index)
+		output.push_front("main")
+	return output
+
+func route_definition(route_id: String) -> Dictionary:
+	_ensure_default_routes()
+	var routes_value = metadata.get("routes", {})
+	if routes_value is Dictionary and routes_value.has(route_id) and routes_value[route_id] is Dictionary:
+		return Dictionary(routes_value[route_id]).duplicate(true)
+	return {}
+
+func ensure_route_definition(route_id: String, values: Dictionary = {}) -> Dictionary:
+	if route_id.is_empty():
+		return {}
+	_ensure_default_routes()
+	var routes: Dictionary = metadata["routes"]
+	var definition: Dictionary = {}
+	if routes.has(route_id) and routes[route_id] is Dictionary:
+		definition = Dictionary(routes[route_id]).duplicate(true)
+	else:
+		definition = {
+			"id": route_id,
+			"type": "main" if route_id == "main" else "alternate",
+			"parent": "" if route_id == "main" else "main",
+			"preferred": route_id == "main",
+			"legal": true
+		}
+	for key in values:
+		definition[key] = values[key]
+	definition["id"] = route_id
+	routes[route_id] = definition
+	metadata["routes"] = routes
+	dirty = true
+	return definition.duplicate(true)
+
+func remove_route_definition(route_id: String) -> bool:
+	if route_id == "main":
+		return false
+	_ensure_default_routes()
+	var routes: Dictionary = metadata["routes"]
+	if not routes.has(route_id):
+		return false
+	routes.erase(route_id)
+	metadata["routes"] = routes
+	dirty = true
+	return true
+
 func set_road(cell: Vector2i, surface: String = "asphalt", road_width: String = "standard") -> bool:
 	if not in_bounds(cell):
 		return false
 	var key := _key(cell)
 	var previous: Dictionary = road_tiles.get(key, {})
-	var item := previous.duplicate(true)
+	var item: Dictionary = previous.duplicate(true)
 	item["x"] = cell.x
 	item["y"] = cell.y
 	item["type"] = surface if surface in DRIVEABLE_SURFACES else "asphalt"
 	item["connection_mask"] = int(previous.get("connection_mask", 0))
 	item["variant"] = int(previous.get("variant", 0))
-	item["width"] = road_width
+	item["width"] = road_width if road_width in ROAD_WIDTHS else "standard"
 	if not item.has("route_id"):
 		item["route_id"] = "main"
 	road_tiles[key] = item
+	ensure_route_definition(str(item["route_id"]))
 	_recalculate_around(cell)
 	dirty = true
 	return true
@@ -67,7 +153,7 @@ func set_road_surface(cell: Vector2i, surface: String) -> bool:
 	return true
 
 func set_road_width(cell: Vector2i, road_width: String) -> bool:
-	if not has_road(cell) or road_width not in ["narrow", "standard", "wide", "extra_wide"]:
+	if not has_road(cell) or road_width not in ROAD_WIDTHS:
 		return false
 	road_tiles[_key(cell)]["width"] = road_width
 	dirty = true
@@ -79,6 +165,8 @@ func set_road_metadata(cell: Vector2i, values: Dictionary) -> bool:
 	for key in values:
 		if key not in ["x", "y", "connection_mask"]:
 			road_tiles[_key(cell)][key] = values[key]
+	if values.has("route_id"):
+		ensure_route_definition(str(values["route_id"]))
 	dirty = true
 	return true
 
@@ -227,7 +315,9 @@ func from_dict(data: Dictionary) -> void:
 	event_presets = _typed_dictionary_array(data.get("event_presets", []))
 	var raw_metadata = data.get("metadata", {})
 	metadata = raw_metadata.duplicate(true) if raw_metadata is Dictionary else {}
+	_ensure_default_routes()
 	for cell in road_cells():
+		ensure_route_definition(get_route_id(cell))
 		_recalculate_mask(cell)
 	dirty = false
 
@@ -236,6 +326,15 @@ func clone():
 	copy.from_dict(to_dict())
 	copy.dirty = dirty
 	return copy
+
+func _ensure_default_routes() -> void:
+	var routes_value = metadata.get("routes", {})
+	var routes: Dictionary = {}
+	if routes_value is Dictionary:
+		routes = Dictionary(routes_value)
+	if not routes.has("main") or not routes["main"] is Dictionary:
+		routes["main"] = {"id": "main", "type": "main", "parent": "", "preferred": true, "legal": true}
+	metadata["routes"] = routes
 
 func _recalculate_around(cell: Vector2i) -> void:
 	_recalculate_mask(cell)
