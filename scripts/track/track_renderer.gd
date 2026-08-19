@@ -16,6 +16,8 @@ var cursor_visible := false
 var cursor_color := Color(0.2, 0.9, 1.0, 0.7)
 var validation_issues: Array[Dictionary] = []
 var show_grid := true
+var selection_active := false
+var selection_rect := Rect2i()
 
 func set_track(source_track) -> void:
 	track = source_track
@@ -28,6 +30,11 @@ func set_cursor(cell: Vector2i, visible: bool = true) -> void:
 
 func set_validation_issues(issues: Array[Dictionary]) -> void:
 	validation_issues = issues
+	queue_redraw()
+
+func set_selection(rect: Rect2i, active: bool) -> void:
+	selection_rect = rect
+	selection_active = active
 	queue_redraw()
 
 func _draw() -> void:
@@ -43,6 +50,10 @@ func _draw() -> void:
 	_draw_issue_markers(size)
 	if show_grid:
 		_draw_grid(size)
+	if selection_active:
+		var world_selection := Rect2(Vector2(selection_rect.position) * size, Vector2(selection_rect.size) * size)
+		draw_rect(world_selection, Color(0.2, 0.85, 1.0, 0.12), true)
+		draw_rect(world_selection, Color(0.2, 0.85, 1.0, 0.95), false, 3.0)
 	if cursor_visible and track.in_bounds(cursor_cell):
 		draw_rect(Rect2(Vector2(cursor_cell) * size, Vector2.ONE * size), cursor_color, false, 2.0)
 

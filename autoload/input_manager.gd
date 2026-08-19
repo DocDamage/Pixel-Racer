@@ -16,7 +16,8 @@ const ACTIONS := {
 	"builder_next_tool": [KEY_E],
 	"builder_prev_tool": [KEY_Q],
 	"builder_place": [KEY_ENTER],
-	"builder_erase": [KEY_BACKSPACE]
+	"builder_erase": [KEY_BACKSPACE],
+	"builder_eyedropper": [KEY_X]
 }
 
 func _ready() -> void:
@@ -36,6 +37,7 @@ func _ready() -> void:
 	_add_joy_button("toggle_test", JOY_BUTTON_START)
 	_add_joy_button("builder_place", JOY_BUTTON_A)
 	_add_joy_button("builder_erase", JOY_BUTTON_B)
+	_add_joy_button("builder_eyedropper", JOY_BUTTON_X)
 	_add_joy_button("builder_prev_tool", JOY_BUTTON_LEFT_SHOULDER)
 	_add_joy_button("builder_next_tool", JOY_BUTTON_RIGHT_SHOULDER)
 
