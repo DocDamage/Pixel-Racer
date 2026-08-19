@@ -159,8 +159,11 @@ func _physics_process(delta: float) -> void:
 		_boost_toggle = false
 	forward_speed = clampf(forward_speed, -120.0, max_speed)
 	velocity = forward * forward_speed + right * lateral_speed
+	var pre_collision_speed := velocity.length()
 	move_and_slide()
 	if get_slide_collision_count() > 0:
+		if audio != null:
+			audio.trigger_impact(clampf(pre_collision_speed / 420.0, 0.15, 1.0))
 		velocity *= 0.68
 		if _collision_rumble_cooldown <= 0.0:
 			_rumble(0.52, 0.22)
