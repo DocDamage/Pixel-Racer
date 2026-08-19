@@ -1,6 +1,7 @@
 extends Node2D
 class_name CollisionFX
 
+const SettingsAccessScript = preload("res://scripts/utilities/settings_access.gd")
 const MAX_PARTICLES := 160
 const SPARK_COLOR := Color(1.0, 0.78, 0.22, 1.0)
 const HOT_COLOR := Color(1.0, 0.38, 0.12, 1.0)
@@ -16,7 +17,7 @@ func emit_impact(world_position: Vector2, normal: Vector2, intensity: float) -> 
 	var strength := clampf(intensity, 0.0, 1.0)
 	if strength <= 0.01:
 		return
-	var flash_scale: float = clampf(float(SettingsManager.get_value("flash_intensity", 1.0)), 0.0, 1.0)
+	var flash_scale: float = clampf(float(SettingsAccessScript.get_value("flash_intensity", 1.0)), 0.0, 1.0)
 	var away := normal.normalized() if normal.length_squared() > 0.001 else Vector2.UP
 	if flash_scale > 0.02:
 		var spark_count := clampi(1 + roundi(strength * flash_scale * 10.0), 1, 12)
