@@ -41,7 +41,7 @@ jobs:
         run: |
           set -o pipefail
           /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
-            --headless --editor --path . --quit-after 2 2>&1 | tee /tmp/godot-import.log
+            --headless --path . --import 2>&1 | tee /tmp/godot-import.log
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script' /tmp/godot-import.log; then
             echo 'Godot reported a script/import error.' >&2
             exit 1
@@ -128,7 +128,7 @@ jobs:
         run: |
           set -o pipefail
           /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
-            --headless --editor --path . --quit-after 2 2>&1 | tee /tmp/godot-export-import.log
+            --headless --path . --import 2>&1 | tee /tmp/godot-export-import.log
           if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script' /tmp/godot-export-import.log; then
             echo 'Godot reported a script/import error before export.' >&2
             exit 1
