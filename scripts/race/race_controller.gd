@@ -7,8 +7,14 @@ signal race_finished(total_time: float)
 signal checkpoint_changed(index: int, total: int)
 signal event_failed(reason: String)
 signal status_changed(text: String)
+signal penalty_changed(total_penalty: float, message: String)
+signal pit_state_changed(in_pit: bool, speed_limit: float)
 
-var track = null
+const PIT_SPEED_GRACE_SECONDS := 0.7
+const PIT_SPEED_PENALTY_SECONDS := 2.0
+const DISPLAY_SPEED_SCALE := 0.42
+
+var track: TrackData = null
 var vehicle: ArcadeVehicle = null
 var mode := "circuit"
 var laps_required := 3
@@ -24,10 +30,16 @@ var failed := false
 var event_limit := 0.0
 var checkpoint_bonus := 0.0
 var checkpoint_deadline_msec := 0
+var time_penalty := 0.0
+var lap_penalty := 0.0
+var in_pit_lane := false
+var pit_speed_limit := 0.0
+var pit_violation_time := 0.0
+var _pit_penalty_latched := false
 var _start_armed := false
 var _countdown_token := 0
 
-func setup(source_track, player_vehicle: ArcadeVehicle, laps: int = 3, event_mode: String = "circuit") -> void:
+func setup(source_track: TrackData, player_vehicle: ArcadeVehicle, laps: int = 3, event_mode: String = "circuit") -> void:
 	track = source_track
 	vehicle = player_vehicle
 	mode = event_mode if RaceModeCatalog.MODES.has(event_mode) else "circuit"
@@ -44,6 +56,12 @@ func setup(source_track, player_vehicle: ArcadeVehicle, laps: int = 3, event_mod
 	running = false
 	finished = false
 	failed = false
+	time_penalty = 0.0
+	lap_penalty = 0.0
+	in_pit_lane = false
+	pit_speed_limit = 0.0
+	pit_violation_time = 0.0
+	_pit_penalty_latched = false
 	_start_armed = false
 
 func start_countdown() -> void:
@@ -67,6 +85,8 @@ func start_race() -> void:
 	failed = false
 	current_lap = 1
 	current_checkpoint = 0
+	time_penalty = 0.0
+	lap_penalty = 0.0
 	race_start_msec = Time.get_ticks_msec()
 	lap_start_msec = race_start_msec
 	_start_armed = false
@@ -80,28 +100,40 @@ func stop() -> void:
 	_countdown_token += 1
 	running = false
 
+func raw_lap_time() -> float:
+	if lap_start_msec <= 0:
+		return 0.0
+	return float(Time.get_ticks_msec() - lap_start_msec) / 1000.0
+
 func current_lap_time() -> float:
 	if not running:
 		return last_lap
-	return float(Time.get_ticks_msec() - lap_start_msec) / 1000.0
+	return raw_lap_time() + lap_penalty
 
-func total_time() -> float:
+func raw_total_time() -> float:
 	if race_start_msec <= 0:
 		return 0.0
 	return float(Time.get_ticks_msec() - race_start_msec) / 1000.0
 
+func total_time() -> float:
+	return raw_total_time() + time_penalty
+
 func remaining_time() -> float:
 	if mode == "drift":
-		return maxf(0.0, event_limit - total_time())
+		return maxf(0.0, event_limit - raw_total_time())
 	if mode == "checkpoint":
 		return maxf(0.0, float(checkpoint_deadline_msec - Time.get_ticks_msec()) / 1000.0)
 	return 0.0
 
-func _process(_delta: float) -> void:
+func current_display_speed() -> float:
+	return vehicle.velocity.length() * DISPLAY_SPEED_SCALE if vehicle != null else 0.0
+
+func _process(delta: float) -> void:
 	if not running or finished or failed or track == null or vehicle == null:
 		return
+	_update_pit_state(delta)
 	if mode == "drift":
-		if total_time() >= event_limit:
+		if raw_total_time() >= event_limit:
 			_finish_event()
 		else:
 			status_changed.emit(_status_text())
@@ -132,6 +164,39 @@ func _process(_delta: float) -> void:
 	elif _start_armed and distance <= track.cell_size * 0.45 and current_checkpoint >= checkpoints.size():
 		_complete_lap()
 
+func _update_pit_state(delta: float) -> void:
+	var cell := track.world_to_cell(vehicle.global_position)
+	var was_in_pit := in_pit_lane
+	in_pit_lane = track.has_road(cell) and (track.get_route_id(cell) == "pit" or bool(track.get_road(cell).get("is_pit", false)))
+	if not in_pit_lane:
+		pit_speed_limit = 0.0
+		pit_violation_time = 0.0
+		_pit_penalty_latched = false
+		if was_in_pit:
+			pit_state_changed.emit(false, 0.0)
+		return
+	var road: Dictionary = track.get_road(cell)
+	var pit_definition: Dictionary = track.route_definition("pit")
+	pit_speed_limit = float(road.get("pit_speed_limit", pit_definition.get("speed_limit", 120.0)))
+	if not was_in_pit:
+		pit_state_changed.emit(true, pit_speed_limit)
+	if current_display_speed() > pit_speed_limit + 0.5:
+		pit_violation_time += delta
+		if pit_violation_time >= PIT_SPEED_GRACE_SECONDS and not _pit_penalty_latched:
+			_apply_time_penalty(PIT_SPEED_PENALTY_SECONDS, "PIT SPEEDING +%.0fs" % PIT_SPEED_PENALTY_SECONDS)
+			_pit_penalty_latched = true
+	else:
+		pit_violation_time = maxf(0.0, pit_violation_time - delta * 2.0)
+
+func _apply_time_penalty(seconds: float, message: String) -> void:
+	var amount := maxf(0.0, seconds)
+	if amount <= 0.0:
+		return
+	time_penalty += amount
+	lap_penalty += amount
+	penalty_changed.emit(time_penalty, message)
+	status_changed.emit(message)
+
 func _complete_lap() -> void:
 	_start_armed = false
 	last_lap = current_lap_time()
@@ -144,12 +209,14 @@ func _complete_lap() -> void:
 		return
 	current_lap += 1
 	current_checkpoint = 0
+	lap_penalty = 0.0
 	lap_start_msec = Time.get_ticks_msec()
 	checkpoint_changed.emit(current_checkpoint, track.get_checkpoints_sorted().size())
 	status_changed.emit(_status_text())
 
 func _finish_event() -> void:
-	last_lap = current_lap_time()
+	if running:
+		last_lap = current_lap_time()
 	if mode == "drift" and track != null and vehicle != null:
 		RecordManager.new().record_score(track.track_id, vehicle.vehicle_id, mode, vehicle.drift_score)
 	finished = true
@@ -164,9 +231,12 @@ func _fail_event(reason: String) -> void:
 	status_changed.emit(reason)
 
 func _status_text() -> String:
+	var suffix := "  •  PIT %.0f" % pit_speed_limit if in_pit_lane else ""
+	if time_penalty > 0.0:
+		suffix += "  •  +%.0fs" % time_penalty
 	match mode:
-		"drift": return "DRIFT %.0f  •  %.1fs" % [vehicle.drift_score if vehicle != null else 0.0, remaining_time()]
-		"checkpoint": return "CHECKPOINT %d/%d  •  %.1fs" % [current_checkpoint, track.get_checkpoints_sorted().size() if track != null else 0, remaining_time()]
-		"sprint": return "SPRINT  •  GATE %d/%d" % [current_checkpoint, track.get_checkpoints_sorted().size() if track != null else 0]
-		"time_trial": return "TIME TRIAL  •  %.2f" % current_lap_time()
-		_: return "LAP %d/%d" % [current_lap, laps_required]
+		"drift": return "DRIFT %.0f  •  %.1fs%s" % [vehicle.drift_score if vehicle != null else 0.0, remaining_time(), suffix]
+		"checkpoint": return "CHECKPOINT %d/%d  •  %.1fs%s" % [current_checkpoint, track.get_checkpoints_sorted().size() if track != null else 0, remaining_time(), suffix]
+		"sprint": return "SPRINT  •  GATE %d/%d%s" % [current_checkpoint, track.get_checkpoints_sorted().size() if track != null else 0, suffix]
+		"time_trial": return "TIME TRIAL  •  %.2f%s" % [current_lap_time(), suffix]
+		_: return "LAP %d/%d%s" % [current_lap, laps_required, suffix]
