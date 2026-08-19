@@ -8,6 +8,7 @@ var camera: Camera2D
 var player: ArcadeVehicle
 var race_controller: RaceController
 var elimination_manager: EliminationManager
+var race_progress := RaceProgressTracker.new()
 var ai_nodes: Array[AIDriver] = []
 var ai_vehicles: Array[ArcadeVehicle] = []
 var ghost := GhostRecorder.new()
@@ -21,6 +22,9 @@ var validation_result: Dictionary = {}
 var saved_camera_position := Vector2.ZERO
 var saved_camera_zoom := Vector2.ONE
 var active_race_mode := "circuit"
+var active_event_laps := 3
+var active_event_ai_count := 0
+var active_championship_id := ""
 
 func _ready() -> void:
 	career.load_profile()
@@ -36,9 +40,14 @@ func _process(delta: float) -> void:
 	if player != null and is_instance_valid(player) and GameState.current_mode in [GameState.MODE_TEST, GameState.MODE_RACE]:
 		var lookahead := player.velocity * 0.18
 		camera.position = camera.position.lerp(player.global_position + lookahead, clampf(delta * 6.0, 0.0, 1.0))
+		_apply_camera_feedback(delta)
 		ghost.capture(delta, player)
+		if GameState.current_mode == GameState.MODE_RACE and race_progress != null:
+			race_progress.update()
 		if ui != null:
 			ui.update_race_hud(race_state())
+	elif camera != null:
+		camera.offset = camera.offset.lerp(Vector2.ZERO, clampf(delta * 12.0, 0.0, 1.0))
 	if GameState.current_mode == GameState.MODE_TEST:
 		if Input.is_action_just_pressed("toggle_test") or Input.is_action_just_pressed("ui_cancel"):
 			return_to_builder()
@@ -84,7 +93,7 @@ func set_track(new_track: TrackData, reset_history: bool = true) -> void:
 		ui.refresh_builder()
 
 func show_menu() -> void:
-	_cleanup_race()
+	_cleanup_race(true)
 	builder.set_enabled(false)
 	GameState.set_mode(GameState.MODE_MENU)
 	camera.position = _builder_focus_position()
@@ -93,7 +102,7 @@ func show_menu() -> void:
 		ui.show_menu()
 
 func enter_builder() -> void:
-	_cleanup_race()
+	_cleanup_race(true)
 	GameState.set_mode(GameState.MODE_BUILDER)
 	builder.set_enabled(true)
 	camera.position = _builder_focus_position()
@@ -121,7 +130,7 @@ func enter_test_drive() -> void:
 
 func return_to_builder() -> void:
 	ghost.stop()
-	_cleanup_race()
+	_cleanup_race(true)
 	GameState.set_mode(GameState.MODE_BUILDER)
 	builder.set_enabled(true)
 	camera.position = saved_camera_position
@@ -137,7 +146,7 @@ func start_random_track() -> void:
 	if ui != null:
 		ui.show_status("Generated a valid editable circuit.")
 
-func start_event(mode: String = "circuit", laps_override: int = 0, ai_override: int = -1) -> bool:
+func start_event(mode: String = "circuit", laps_override: int = 0, ai_override: int = -1, championship_id: String = "") -> bool:
 	validate_track()
 	if not bool(validation_result.get("raceable", false)):
 		if ui != null:
@@ -148,20 +157,44 @@ func start_event(mode: String = "circuit", laps_override: int = 0, ai_override: 
 	var ai_count := int(preset.get("ai_count", 0)) if ai_override < 0 else ai_override
 	if mode in ["time_trial", "sprint", "checkpoint", "drift"]:
 		ai_count = 0
-	_cleanup_race()
+	_cleanup_race(false)
+	active_race_mode = mode
+	active_event_laps = laps
+	active_event_ai_count = ai_count
+	active_championship_id = championship_id
 	builder.set_enabled(false)
 	GameState.set_mode(GameState.MODE_RACE)
-	active_race_mode = mode
 	_spawn_player(false)
 	if mode == "time_trial":
 		_prepare_best_ghost()
 	_spawn_ai(ai_count)
+	var racers: Array[ArcadeVehicle] = [player]
+	racers.append_array(ai_vehicles)
+	race_progress = RaceProgressTracker.new()
+	race_progress.setup(track, racers, 999999 if mode == "elimination" else laps)
+	race_progress.stop()
 	_create_race_controller(laps, mode, true)
 	if mode == "elimination":
 		_create_elimination_manager(float(preset.get("elimination_interval", 20.0)))
 	if ui != null:
 		ui.show_race(str(preset.get("name", mode.to_upper())))
 	return true
+
+func start_championship(championship_id: String) -> bool:
+	var championship := _championship_by_id(championship_id)
+	if championship.is_empty():
+		if ui != null:
+			ui.show_status("Championship is not available at your current career tier.")
+		return false
+	var tier := int(championship.get("tier", 1))
+	var laps := 3 + floori(float(tier - 1) / 2.0)
+	var opponents := clampi(3 + tier, 4, 11)
+	return start_event("circuit", laps, opponents, championship_id)
+
+func restart_current_event() -> bool:
+	if not active_championship_id.is_empty():
+		return start_championship(active_championship_id)
+	return start_event(active_race_mode, active_event_laps, active_event_ai_count)
 
 func save_current_track() -> bool:
 	if track == null:
@@ -283,6 +316,7 @@ func race_state() -> Dictionary:
 		"pit": false,
 		"pit_limit": 0.0,
 		"penalty": 0.0,
+		"position": 1,
 		"lap": 0,
 		"laps": 0,
 		"checkpoint": 0,
@@ -290,7 +324,8 @@ func race_state() -> Dictionary:
 		"time": 0.0,
 		"best": INF,
 		"remaining": 0.0,
-		"racers": 1 + ai_vehicles.size()
+		"racers": 1 + ai_vehicles.size(),
+		"leaderboard": []
 	}
 	if race_controller != null and is_instance_valid(race_controller):
 		state["lap"] = race_controller.current_lap
@@ -302,6 +337,23 @@ func race_state() -> Dictionary:
 		state["pit"] = race_controller.in_pit_lane
 		state["pit_limit"] = race_controller.pit_speed_limit
 		state["penalty"] = race_controller.time_penalty
+	if race_progress != null and not race_progress.path.is_empty():
+		var order := race_progress.standings()
+		state["position"] = maxi(1, race_progress.position_of(player))
+		state["racers"] = order.size()
+		var leaderboard: Array[Dictionary] = []
+		for index in range(mini(5, order.size())):
+			var standing: Dictionary = order[index]
+			var racer: ArcadeVehicle = standing.get("vehicle") as ArcadeVehicle
+			if racer == null:
+				continue
+			leaderboard.append({
+				"position": index + 1,
+				"vehicle_id": racer.vehicle_id,
+				"lap": int(standing.get("lap", 0)) + 1,
+				"finished": bool(standing.get("finished", false))
+			})
+		state["leaderboard"] = leaderboard
 	if elimination_manager != null and is_instance_valid(elimination_manager):
 		state["remaining"] = elimination_manager.remaining
 		state["racers"] = elimination_manager.racers.size()
@@ -319,6 +371,7 @@ func _spawn_player(player_controlled: bool) -> void:
 	player.setup(track, GameState.current_vehicle_id, player_controlled)
 	camera.position = player.global_position
 	camera.zoom = Vector2.ONE
+	camera.offset = Vector2.ZERO
 
 func _prepare_best_ghost() -> void:
 	if track == null or player == null:
@@ -391,7 +444,7 @@ func _create_elimination_manager(interval: float) -> void:
 	add_child(elimination_manager)
 	var racers: Array[ArcadeVehicle] = [player]
 	racers.append_array(ai_vehicles)
-	elimination_manager.setup(track, player, racers, interval)
+	elimination_manager.setup(track, player, racers, interval, race_progress)
 	elimination_manager.stop()
 	elimination_manager.racer_eliminated.connect(_on_racer_eliminated)
 	elimination_manager.player_eliminated.connect(_on_player_eliminated)
@@ -403,6 +456,8 @@ func _on_countdown_changed(value: int) -> void:
 	if value == 0:
 		if GameState.current_mode == GameState.MODE_RACE:
 			ghost.start()
+			if race_progress != null:
+				race_progress.start()
 			if best_ghost != null and is_instance_valid(best_ghost):
 				best_ghost.play()
 		if player != null:
@@ -426,8 +481,30 @@ func _on_penalty_changed(_total_penalty: float, message: String) -> void:
 
 func _on_race_finished(total_time: float) -> void:
 	ghost.stop()
+	var position := 1
+	var field_size := 1
+	if race_progress != null:
+		race_progress.update()
+		if player != null:
+			race_progress.force_finish(player)
+			position = maxi(1, race_progress.position_of(player))
+		field_size = maxi(1, race_progress.standings().size())
+	if not active_championship_id.is_empty():
+		var championship := _championship_by_id(active_championship_id)
+		var championship_name := str(championship.get("name", "Championship"))
+		var already_completed := active_championship_id in career.profile.get("completed_championships", [])
+		var awarded := false
+		if position == 1 and not already_completed:
+			awarded = career.complete_championship(active_championship_id, 1)
+		if ui != null:
+			if position == 1:
+				var reward_text := "Rewards already claimed." if already_completed else ("+%d credits • +%d reputation" % [int(championship.get("reward", 0)), int(championship.get("rep", 0))] if awarded else "Win recorded.")
+				ui.show_result("CHAMPIONSHIP WIN", "%s • P1/%d\n%s" % [championship_name, field_size, reward_text])
+			else:
+				ui.show_result("P%d/%d" % [position, field_size], "%s\nFinish P1 to complete this championship." % championship_name)
+		return
 	if active_race_mode != "elimination" and ui != null:
-		ui.show_result("FINISH", "%.2f seconds" % total_time)
+		ui.show_result("FINISH • P%d/%d" % [position, field_size], "%.2f seconds" % total_time)
 
 func _on_event_failed(reason: String) -> void:
 	ghost.stop()
@@ -459,11 +536,15 @@ func _on_player_eliminated() -> void:
 func _on_player_won() -> void:
 	if race_controller != null:
 		race_controller.stop()
+	if race_progress != null and player != null:
+		race_progress.force_finish(player)
 	if ui != null:
 		ui.show_result("WINNER", "Last racer standing.")
 
-func _cleanup_race() -> void:
+func _cleanup_race(clear_event_context: bool = true) -> void:
 	ghost.stop()
+	if race_progress != null:
+		race_progress.stop()
 	if best_ghost != null and is_instance_valid(best_ghost):
 		best_ghost.stop()
 		best_ghost.queue_free()
@@ -480,11 +561,21 @@ func _cleanup_race() -> void:
 		player.queue_free()
 	player = null
 	for ai in ai_nodes:
-		if is_instance_valid(ai): ai.queue_free()
+		if is_instance_valid(ai):
+			ai.queue_free()
 	for vehicle in ai_vehicles:
-		if is_instance_valid(vehicle): vehicle.queue_free()
+		if is_instance_valid(vehicle):
+			vehicle.queue_free()
 	ai_nodes.clear()
 	ai_vehicles.clear()
+	race_progress = RaceProgressTracker.new()
+	if camera != null:
+		camera.offset = Vector2.ZERO
+	if clear_event_context:
+		active_race_mode = "circuit"
+		active_event_laps = 3
+		active_event_ai_count = 0
+		active_championship_id = ""
 
 func _on_track_changed() -> void:
 	validate_track()
@@ -508,6 +599,28 @@ func _on_tool_changed(_tool_name: String) -> void:
 func _on_builder_load_requested() -> void:
 	if ui != null:
 		ui.open_track_library()
+
+func _apply_camera_feedback(delta: float) -> void:
+	if camera == null or player == null:
+		return
+	var strength := clampf(float(SettingsManager.get_value("camera_shake", 0.65)), 0.0, 1.0)
+	var amount := 0.0
+	if player.is_boosting:
+		amount = maxf(amount, 2.4)
+	if player.is_drifting:
+		amount = maxf(amount, 0.9)
+	if player.current_surface in ["dirt", "gravel"] and player.velocity.length() > 120.0:
+		amount = maxf(amount, 0.55)
+	var target := Vector2.ZERO
+	if strength > 0.001 and amount > 0.0:
+		target = Vector2(randf_range(-amount, amount), randf_range(-amount, amount)) * strength
+	camera.offset = camera.offset.lerp(target, clampf(delta * 14.0, 0.0, 1.0))
+
+func _championship_by_id(championship_id: String) -> Dictionary:
+	for championship in career.available_championships():
+		if str(championship.get("id", "")) == championship_id:
+			return championship.duplicate(true)
+	return {}
 
 func _start_position() -> Dictionary:
 	var start := track.get_start_object()
