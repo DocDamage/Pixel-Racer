@@ -492,7 +492,7 @@ func _on_race_finished(total_time: float) -> void:
 	if not active_championship_id.is_empty():
 		var championship := _championship_by_id(active_championship_id)
 		var championship_name := str(championship.get("name", "Championship"))
-		var already_completed := active_championship_id in career.profile.get("completed_championships", [])
+		var already_completed: bool = active_championship_id in career.profile.get("completed_championships", [])
 		var awarded := false
 		if position == 1 and not already_completed:
 			awarded = career.complete_championship(active_championship_id, 1)
