@@ -22,6 +22,7 @@ var validation_label: Label
 var tool_label: Label
 var builder_status: Label
 var race_title: Label
+var race_status_label: Label
 var lap_label: Label
 var timer_label: Label
 var speed_label: Label
@@ -29,6 +30,8 @@ var nitro_bar: ProgressBar
 var countdown_label: Label
 var current_vehicle_label: Label
 var _countdown_generation := 0
+var _rebind_action := ""
+var _rebind_label := ""
 
 func setup(game_root) -> void:
 	game = game_root
@@ -38,6 +41,11 @@ func setup(game_root) -> void:
 	_build_builder_hud()
 	_build_race_hud()
 	_build_status_banner()
+	if not SettingsManager.setting_changed.is_connected(_on_setting_changed):
+		SettingsManager.setting_changed.connect(_on_setting_changed)
+	if not SettingsManager.settings_reset.is_connected(_apply_accessibility_visuals):
+		SettingsManager.settings_reset.connect(_apply_accessibility_visuals)
+	_apply_accessibility_visuals()
 
 func show_menu() -> void:
 	_clear_modal()
@@ -78,7 +86,7 @@ func refresh_builder() -> void:
 	if not errors.is_empty():
 		builder_status.text = "%s @ %s" % [str(errors[0].get("message", "Invalid track")), str(errors[0].get("cell", Vector2i.ZERO))]
 	else:
-		builder_status.text = "LMB paint • Shift-drag select • Ctrl+C/X/V • R rotate • M mirror • X eyedrop • F5 test"
+		builder_status.text = "Shift-drag select • Ctrl+1 main / 2 pit / 3 alt • Ctrl+C/X/V • R/M • X eyedrop • F5 test"
 
 func update_race_hud(state: Dictionary) -> void:
 	if state.is_empty() or not race_hud.visible:
@@ -102,6 +110,15 @@ func update_race_hud(state: Dictionary) -> void:
 		lap_label.text = "LAP %d/%d  •  CP %d/%d" % [int(state.get("lap", 0)), int(state.get("laps", 0)), int(state.get("checkpoint", 0)), int(state.get("checkpoints", 0))]
 		var best_value := float(state.get("best", INF))
 		timer_label.text = "%.2f  •  BEST %s" % [float(state.get("time", 0.0)), "--" if is_inf(best_value) else "%.2f" % best_value]
+	var penalty := float(state.get("penalty", 0.0))
+	if bool(state.get("pit", false)):
+		race_status_label.text = "PIT • LIMIT %.0f%s" % [float(state.get("pit_limit", 0.0)), " • +%.0fs" % penalty if penalty > 0.0 else ""]
+		race_status_label.add_theme_color_override("font_color", GOLD)
+	else:
+		var route := str(state.get("route", "main"))
+		var surface := str(state.get("surface", "asphalt"))
+		race_status_label.text = "%s%s" % [route.to_upper() if route != "main" else surface.to_upper(), " • +%.0fs" % penalty if penalty > 0.0 else ""]
+		race_status_label.add_theme_color_override("font_color", BAD if penalty > 0.0 else MUTED)
 
 func show_countdown(text: String) -> void:
 	_countdown_generation += 1
@@ -180,17 +197,17 @@ func open_race_setup() -> void:
 
 func open_track_library() -> void:
 	_clear_modal()
-	var panel := _modal_panel("TRACK LIBRARY", Vector2(65, 25), Vector2(510, 310))
+	var panel := _modal_panel("TRACK LIBRARY", Vector2(45, 18), Vector2(550, 324))
 	var box := panel.get_node("Content") as VBoxContainer
 	var controls := HBoxContainer.new()
 	box.add_child(controls)
 	controls.add_child(_make_button("IMPORT JSON", _open_import_dialog, GOLD, Vector2(120, 26)))
 	controls.add_child(_make_button("EXPORT CURRENT", func(): game.export_current_package(), ACCENT, Vector2(135, 26)))
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(470, 205)
+	scroll.custom_minimum_size = Vector2(510, 225)
 	box.add_child(scroll)
 	var list := VBoxContainer.new()
-	list.custom_minimum_size = Vector2(452, 0)
+	list.custom_minimum_size = Vector2(492, 0)
 	scroll.add_child(list)
 	var entries: Array[Dictionary] = game.track_library_entries()
 	if entries.is_empty():
@@ -200,7 +217,7 @@ func open_track_library() -> void:
 	else:
 		for entry in entries:
 			list.add_child(_track_card(entry))
-	box.add_child(_make_button("CLOSE", _clear_modal, MUTED, Vector2(470, 26)))
+	box.add_child(_make_button("CLOSE", _clear_modal, MUTED, Vector2(510, 26)))
 
 func open_garage() -> void:
 	_clear_modal()
@@ -261,32 +278,51 @@ func open_career() -> void:
 	box.add_child(_make_button("CLOSE", _clear_modal, MUTED, Vector2(470, 26)))
 
 func open_settings() -> void:
+	_rebind_action = ""
 	_clear_modal()
-	var panel := _modal_panel("SETTINGS + ACCESSIBILITY", Vector2(130, 42), Vector2(380, 275))
-	var box := panel.get_node("Content") as VBoxContainer
-	for pair in [["Traction Assist", "traction_assist"], ["Auto Accelerate", "auto_accelerate"], ["Recovery Assist", "recovery_assist"], ["Large Text", "large_text"], ["Colorblind Indicators", "colorblind_indicators"]]:
-		var toggle := CheckButton.new()
-		toggle.text = str(pair[0])
-		toggle.button_pressed = bool(SettingsManager.get_value(str(pair[1]), false))
-		var key := str(pair[1])
-		toggle.toggled.connect(func(value: bool): SettingsManager.set_value(key, value))
-		box.add_child(toggle)
-	var shake_row := HBoxContainer.new()
-	var shake_label := Label.new()
-	shake_label.text = "Camera Shake"
-	shake_label.custom_minimum_size = Vector2(130, 24)
-	shake_row.add_child(shake_label)
-	var shake := HSlider.new()
-	shake.min_value = 0.0
-	shake.max_value = 1.0
-	shake.step = 0.05
-	shake.value = float(SettingsManager.get_value("camera_shake", 0.65))
-	shake.custom_minimum_size = Vector2(170, 24)
-	shake.value_changed.connect(func(value: float): SettingsManager.set_value("camera_shake", value))
-	shake_row.add_child(shake)
-	box.add_child(shake_row)
-	box.add_child(_make_button("RESET DEFAULTS", SettingsManager.reset_defaults, GOLD, Vector2(330, 27)))
-	box.add_child(_make_button("CLOSE", _clear_modal, MUTED, Vector2(330, 27)))
+	var panel := _modal_panel("SETTINGS + ACCESSIBILITY", Vector2(45, 18), Vector2(550, 324))
+	var outer := panel.get_node("Content") as VBoxContainer
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(510, 246)
+	outer.add_child(scroll)
+	var box := VBoxContainer.new()
+	box.custom_minimum_size = Vector2(490, 0)
+	box.add_theme_constant_override("separation", 4)
+	scroll.add_child(box)
+	_add_section_label(box, "ACCESSIBILITY + ASSISTS")
+	for pair in [["Traction Assist", "traction_assist"], ["Auto Accelerate", "auto_accelerate"], ["Auto Brake", "auto_brake"], ["Recovery Assist", "recovery_assist"], ["Track Edge Assist", "track_edge_assist"], ["Large Text", "large_text"], ["Colorblind Indicators", "colorblind_indicators"], ["Controller Vibration", "controller_vibration"]]:
+		_add_setting_toggle(box, str(pair[0]), str(pair[1]))
+	_add_setting_slider(box, "UI Scale", "ui_scale", 0.75, 1.75, 0.05)
+	_add_setting_slider(box, "Camera Shake", "camera_shake", 0.0, 1.0, 0.05)
+	_add_setting_slider(box, "Flash Intensity", "flash_intensity", 0.0, 1.0, 0.05)
+	_add_setting_slider(box, "Steering Sensitivity", "steering_sensitivity", 0.5, 1.75, 0.05)
+	_add_setting_slider(box, "Drift Assist", "drift_assist", 0.0, 1.0, 0.05)
+	_add_setting_slider(box, "Vibration Strength", "vibration_strength", 0.0, 1.0, 0.05)
+	_add_section_label(box, "AUDIO + DISPLAY")
+	_add_setting_slider(box, "Master Volume", "master_volume", 0.0, 1.0, 0.05)
+	_add_setting_slider(box, "Music Volume", "music_volume", 0.0, 1.0, 0.05)
+	_add_setting_slider(box, "SFX Volume", "sfx_volume", 0.0, 1.0, 0.05)
+	var window_row := HBoxContainer.new()
+	var window_label := Label.new()
+	window_label.text = "Window Mode"
+	window_label.custom_minimum_size = Vector2(190, 24)
+	window_row.add_child(window_label)
+	var window_select := OptionButton.new()
+	for mode in ["windowed", "fullscreen", "borderless"]:
+		window_select.add_item(mode.to_upper())
+		window_select.set_item_metadata(window_select.item_count - 1, mode)
+		if str(SettingsManager.get_value("window_mode", "windowed")) == mode:
+			window_select.select(window_select.item_count - 1)
+	window_select.custom_minimum_size = Vector2(210, 24)
+	window_select.item_selected.connect(func(index: int): SettingsManager.set_value("window_mode", str(window_select.get_item_metadata(index))))
+	window_row.add_child(window_select)
+	box.add_child(window_row)
+	_add_section_label(box, "CONTROLS • CLICK REBIND, THEN PRESS A KEY/BUTTON")
+	for action in ["accelerate", "brake", "steer_left", "steer_right", "handbrake", "boost", "reset_vehicle", "toggle_test", "builder_place", "builder_erase", "builder_eyedropper", "builder_next_tool", "builder_prev_tool"]:
+		_add_binding_row(box, action)
+	outer.add_child(_make_button("RESET SETTINGS + CONTROLS", func(): SettingsManager.reset_defaults(); InputManager.reset_defaults(); open_settings(), GOLD, Vector2(510, 26)))
+	outer.add_child(_make_button("CLOSE", _clear_modal, MUTED, Vector2(510, 26)))
+	_apply_accessibility_visuals()
 
 func _create_layers() -> void:
 	menu_layer = Control.new()
@@ -316,7 +352,6 @@ func _build_main_menu() -> void:
 	title.text = "PIXEL TRACK WORKS"
 	title.position = Vector2(42, 26)
 	title.add_theme_font_size_override("font_size", 27)
-	title.add_theme_color_override("font_color", ACCENT)
 	menu_layer.add_child(title)
 	var subtitle := Label.new()
 	subtitle.text = "BUILD IT • TEST IT • RACE IT"
@@ -339,7 +374,7 @@ func _build_main_menu() -> void:
 	var feature := Label.new()
 	feature.position = Vector2(340, 112)
 	feature.size = Vector2(255, 140)
-	feature.text = "SMART TRACK BUILDER\nINSTANT TEST DRIVE\n6 EVENT RULE SETS\nAI OVERTAKING + DRAFTING\nDRIFT • NITRO • GHOSTS\nCAREER + GARAGE"
+	feature.text = "SMART TRACK BUILDER\nINSTANT TEST DRIVE\n6 EVENT RULE SETS\nAI OVERTAKING + DRAFTING\nDRIFT • NITRO • BEST GHOSTS\nCAREER + GARAGE"
 	feature.add_theme_font_size_override("font_size", 13)
 	feature.add_theme_color_override("font_color", TEXT)
 	feature.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -376,20 +411,20 @@ func _build_builder_hud() -> void:
 	row.add_child(_make_button("MENU", game.show_menu, MUTED, Vector2(52, 29)))
 	var tools := PanelContainer.new()
 	tools.position = Vector2(0, 48)
-	tools.size = Vector2(108, 275)
+	tools.size = Vector2(108, 246)
 	tools.add_theme_stylebox_override("panel", _panel_style(Color(0.07, 0.08, 0.11, 0.94), 6))
 	builder_hud.add_child(tools)
 	var tool_box := VBoxContainer.new()
-	tool_box.add_theme_constant_override("separation", 2)
+	tool_box.add_theme_constant_override("separation", 1)
 	tools.add_child(tool_box)
 	tool_label = Label.new()
 	tool_label.text = "BUILD TOOLS"
 	tool_label.add_theme_color_override("font_color", ACCENT)
 	tool_box.add_child(tool_label)
-	var names := {"road":"1 ROAD", "sand":"2 SAND", "dirt":"3 DIRT", "grass":"4 GRASS", "start_finish":"5 START", "checkpoint":"6 CHECK", "barrier":"7 BARRIER", "erase":"8 ERASE"}
+	var names := {"road":"1 ROAD", "draw_road":"2 DRAW", "pit":"3 PIT", "alternate":"B ALT", "sand":"4 SAND", "dirt":"5 DIRT", "grass":"6 GRASS", "start_finish":"7 START", "checkpoint":"8 CHECK", "barrier":"9 BARRIER", "erase":"0 ERASE"}
 	for tool in BuilderController.TOOLS:
 		var tool_id := tool
-		tool_box.add_child(_make_button(str(names.get(tool, tool.to_upper())), func(): game.builder.set_tool(tool_id), PANEL_2, Vector2(96, 24)))
+		tool_box.add_child(_make_button(str(names.get(tool, tool.to_upper())), func(): game.builder.set_tool(tool_id), PANEL_2, Vector2(96, 20)))
 	var actions := HBoxContainer.new()
 	actions.position = Vector2(116, 302)
 	actions.add_theme_constant_override("separation", 3)
@@ -410,7 +445,7 @@ func _build_builder_hud() -> void:
 func _build_race_hud() -> void:
 	var panel := PanelContainer.new()
 	panel.position = Vector2(10, 10)
-	panel.size = Vector2(255, 83)
+	panel.size = Vector2(285, 103)
 	panel.add_theme_stylebox_override("panel", _panel_style(Color(0.04, 0.05, 0.08, 0.88), 8))
 	race_hud.add_child(panel)
 	var box := VBoxContainer.new()
@@ -423,6 +458,10 @@ func _build_race_hud() -> void:
 	timer_label = Label.new()
 	timer_label.add_theme_color_override("font_color", ACCENT)
 	box.add_child(timer_label)
+	race_status_label = Label.new()
+	race_status_label.add_theme_font_size_override("font_size", 10)
+	race_status_label.add_theme_color_override("font_color", MUTED)
+	box.add_child(race_status_label)
 	speed_label = Label.new()
 	speed_label.position = Vector2(500, 300)
 	speed_label.size = Vector2(130, 30)
@@ -463,20 +502,54 @@ func _build_status_banner() -> void:
 
 func _track_card(entry: Dictionary) -> Control:
 	var card := PanelContainer.new()
-	card.custom_minimum_size = Vector2(445, 62)
+	card.custom_minimum_size = Vector2(485, 78)
 	card.add_theme_stylebox_override("panel", _panel_style(PANEL_2, 6))
 	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
 	card.add_child(row)
+	var preview_path := str(entry.get("preview_path", ""))
+	var preview := TextureRect.new()
+	preview.custom_minimum_size = Vector2(88, 58)
+	preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	if not preview_path.is_empty() and FileAccess.file_exists(preview_path):
+		var image := Image.new()
+		if image.load(preview_path) == OK:
+			preview.texture = ImageTexture.create_from_image(image)
+	row.add_child(preview)
 	var info := Label.new()
-	info.custom_minimum_size = Vector2(245, 50)
+	info.custom_minimum_size = Vector2(280, 60)
 	var rating: Dictionary = entry.get("rating", {})
-	info.text = "%s\n%.0f length • %d corners • difficulty %d/5" % [str(entry.get("name", "Track")), float(rating.get("length", 0.0)), int(rating.get("corners", 0)), int(rating.get("difficulty", 1))]
+	var best_time := INF
+	var best_score := 0.0
+	for record in entry.get("records", []):
+		if not record is Dictionary:
+			continue
+		if str(record.get("kind", "")) == "time":
+			best_time = minf(best_time, float(record.get("value", INF)))
+		elif str(record.get("kind", "")) == "score":
+			best_score = maxf(best_score, float(record.get("value", 0.0)))
+	var record_text := "NO RECORD"
+	if not is_inf(best_time):
+		record_text = "BEST %.2fs" % best_time
+	if best_score > 0.0:
+		record_text += " • DRIFT %.0f" % best_score
+	var ghost_count := Array(entry.get("ghosts", [])).size()
+	if ghost_count > 0:
+		record_text += " • GHOST"
+	info.text = "%s\n%.0f length • %d corners • difficulty %d/5 • off-road %d%%\n%s" % [str(entry.get("name", "Track")), float(rating.get("length", 0.0)), int(rating.get("corners", 0)), int(rating.get("difficulty", 1)), int(rating.get("offroad_percent", 0)), record_text]
+	info.add_theme_font_size_override("font_size", 10)
 	row.add_child(info)
 	var id := str(entry.get("track_id", ""))
 	var buttons := VBoxContainer.new()
 	row.add_child(buttons)
-	buttons.add_child(_make_button("EDIT", func(): _clear_modal(); game.load_track_by_id(id, true), ACCENT, Vector2(82, 22)))
-	buttons.add_child(_make_button("RACE", func(): _clear_modal(); if game.load_track_by_id(id, false): game.start_event("circuit"), MAGENTA, Vector2(82, 22)))
+	buttons.add_child(_make_button("EDIT", func(): _clear_modal(); game.load_track_by_id(id, true), ACCENT, Vector2(82, 20)))
+	buttons.add_child(_make_button("RACE", func(): _clear_modal(); if game.load_track_by_id(id, false): game.start_event("circuit"), MAGENTA, Vector2(82, 20)))
+	buttons.add_child(_make_button("DELETE", func():
+		if SaveManager.delete_track(id):
+			show_status("Track deleted.")
+			open_track_library()
+	, BAD, Vector2(82, 20)))
 	return card
 
 func _open_vehicle_detail(vehicle_id: String) -> void:
@@ -543,6 +616,124 @@ func _open_import_dialog() -> void:
 	add_child(dialog)
 	dialog.popup_centered()
 
+func _begin_rebind(action: String) -> void:
+	_rebind_action = action
+	_rebind_label = action.replace("_", " ").to_upper()
+	var panel := _modal_panel("REBIND %s" % _rebind_label, Vector2(150, 110), Vector2(340, 140))
+	var box := panel.get_node("Content") as VBoxContainer
+	var message := Label.new()
+	message.text = "Press a keyboard key, gamepad button, or move a gamepad axis.\nESC cancels."
+	message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message.custom_minimum_size = Vector2(300, 50)
+	box.add_child(message)
+	box.add_child(_make_button("CANCEL", func(): _rebind_action = ""; open_settings(), MUTED, Vector2(300, 28)))
+
+func _input(event: InputEvent) -> void:
+	if _rebind_action.is_empty():
+		return
+	if event is InputEventKey:
+		var key_event := event as InputEventKey
+		if not key_event.pressed or key_event.echo:
+			return
+		if key_event.physical_keycode == KEY_ESCAPE:
+			_rebind_action = ""
+			open_settings()
+			get_viewport().set_input_as_handled()
+			return
+		if key_event.physical_keycode != 0 and InputManager.remap_key(_rebind_action, key_event.physical_keycode):
+			_finish_rebind(OS.get_keycode_string(key_event.physical_keycode))
+	elif event is InputEventJoypadButton:
+		var button_event := event as InputEventJoypadButton
+		if button_event.pressed and InputManager.remap_joy_button(_rebind_action, button_event.button_index):
+			_finish_rebind("Pad Button %d" % button_event.button_index)
+	elif event is InputEventJoypadMotion:
+		var motion_event := event as InputEventJoypadMotion
+		if absf(motion_event.axis_value) >= 0.75 and InputManager.remap_joy_axis(_rebind_action, motion_event.axis, signf(motion_event.axis_value)):
+			_finish_rebind("Pad Axis %d" % motion_event.axis)
+
+func _finish_rebind(description: String) -> void:
+	var label := _rebind_label
+	_rebind_action = ""
+	_rebind_label = ""
+	get_viewport().set_input_as_handled()
+	show_status("%s → %s" % [label, description])
+	open_settings()
+
+func _add_binding_row(parent: VBoxContainer, action: String) -> void:
+	var row := HBoxContainer.new()
+	var label := Label.new()
+	label.text = action.replace("_", " ").capitalize()
+	label.custom_minimum_size = Vector2(170, 24)
+	row.add_child(label)
+	var bindings := InputManager.binding_descriptions(action)
+	var current := Label.new()
+	current.text = ", ".join(bindings.slice(0, mini(2, bindings.size()))) if not bindings.is_empty() else "UNBOUND"
+	current.custom_minimum_size = Vector2(190, 24)
+	current.clip_text = true
+	current.add_theme_font_size_override("font_size", 10)
+	row.add_child(current)
+	row.add_child(_make_button("REBIND", Callable(self, "_begin_rebind").bind(action), ACCENT, Vector2(82, 22)))
+	parent.add_child(row)
+
+func _add_setting_toggle(parent: VBoxContainer, label_text: String, key: String) -> void:
+	var toggle := CheckButton.new()
+	toggle.text = label_text
+	toggle.button_pressed = bool(SettingsManager.get_value(key, false))
+	toggle.toggled.connect(func(value: bool): SettingsManager.set_value(key, value))
+	parent.add_child(toggle)
+
+func _add_setting_slider(parent: VBoxContainer, label_text: String, key: String, min_value: float, max_value: float, step: float) -> void:
+	var row := HBoxContainer.new()
+	var label := Label.new()
+	label.text = label_text
+	label.custom_minimum_size = Vector2(190, 24)
+	row.add_child(label)
+	var slider := HSlider.new()
+	slider.min_value = min_value
+	slider.max_value = max_value
+	slider.step = step
+	slider.value = float(SettingsManager.get_value(key, min_value))
+	slider.custom_minimum_size = Vector2(185, 24)
+	row.add_child(slider)
+	var value_label := Label.new()
+	value_label.custom_minimum_size = Vector2(55, 24)
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	value_label.text = "%.2f" % slider.value
+	row.add_child(value_label)
+	slider.value_changed.connect(func(value: float):
+		value_label.text = "%.2f" % value
+		SettingsManager.set_value(key, value)
+	)
+	parent.add_child(row)
+
+func _add_section_label(parent: VBoxContainer, text_value: String) -> void:
+	var label := Label.new()
+	label.text = text_value
+	label.add_theme_color_override("font_color", ACCENT)
+	label.add_theme_font_size_override("font_size", 11)
+	parent.add_child(label)
+
+func _on_setting_changed(key: String, _value) -> void:
+	if key in ["large_text", "ui_scale"]:
+		_apply_accessibility_visuals()
+
+func _apply_accessibility_visuals() -> void:
+	var large := bool(SettingsManager.get_value("large_text", false))
+	for root_node in [menu_layer, builder_hud, race_hud, modal_layer]:
+		if root_node != null:
+			_apply_font_recursive(root_node, large)
+
+func _apply_font_recursive(node: Node, large: bool) -> void:
+	if node is Control:
+		var control := node as Control
+		if not control.has_meta("ptw_base_font_size"):
+			control.set_meta("ptw_base_font_size", control.get_theme_font_size("font_size"))
+		var base_size := int(control.get_meta("ptw_base_font_size", 12))
+		control.add_theme_font_size_override("font_size", base_size + (2 if large else 0))
+	for child in node.get_children():
+		_apply_font_recursive(child, large)
+
 func _update_vehicle_label() -> void:
 	if current_vehicle_label == null:
 		return
@@ -584,7 +775,8 @@ func _make_button(text_value: String, callback: Callable, accent: Color, min_siz
 	button.text = text_value
 	button.custom_minimum_size = min_size
 	button.focus_mode = Control.FOCUS_ALL
-	button.add_theme_font_size_override("font_size", 10)
+	button.set_meta("ptw_base_font_size", 10)
+	button.add_theme_font_size_override("font_size", 12 if bool(SettingsManager.get_value("large_text", false)) else 10)
 	button.add_theme_color_override("font_color", TEXT)
 	var normal := accent.darkened(0.55) if accent != PANEL_2 else PANEL_2
 	button.add_theme_stylebox_override("normal", _panel_style(normal, 5))
