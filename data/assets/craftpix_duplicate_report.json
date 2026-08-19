@@ -14,27 +14,27 @@
     {
       "path": "PNG/Decor/Bush_02.png",
       "size": [600, 518],
-      "sha256": "481ac756ec0c2302628334249827624b0c7791d2e17d588d0be919ad08ba1ae7"
+      "sha256": "481ac756ec0ca785d2bd49d2f77ba16f48b0697375d9288357c74e7cd98383c8"
     },
     {
       "path": "PNG/Decor/Decor_Building_02.png",
       "size": [766, 1000],
-      "sha256": "c4fce49c6dea80f11324395c4be750a18b8a3f2b3d24b83c85eaed373391752f"
+      "sha256": "c4fce49c6dea37ecc5544c22c3619b3cc7d2cb68f065f3005d51eab42397d0bf"
     },
     {
       "path": "PNG/Decor/Pavilion_02.png",
       "size": [1270, 683],
-      "sha256": "b91e12e26271c7ca67599b69be0e8c6fdf4c49d87e2bb61989c02807e2dba24b"
+      "sha256": "b91e12e26271ff7bb54d20f590cdc3f5d227259c7288ce6ed511f9759edbb165"
     },
     {
       "path": "PNG/Decor/Rock_02.png",
       "size": [720, 272],
-      "sha256": "b940e4e74699c1435bd467161f7a6b8bfa0fa1f90052adcc2944f333ffbc4758"
+      "sha256": "b940e4e746996d546fa01a4baade16618b1995665af1e6bd50e218e206670b28"
     },
     {
       "path": "PNG/Decor/Tree_01.png",
       "size": [950, 816],
-      "sha256": "ff8f34f5071f039635b6614376524955787809f484f2b6d16749e8f0d723f11c"
+      "sha256": "ff8f34f5071f556055d0ee055d53f664fba18c8064ee7589a6cddeb85cd2d0f3"
     }
   ],
   "full_duplicate_map": "Regenerate deterministically with tools/asset_pipeline/inventory_assets.py when the protected source archives are present."
