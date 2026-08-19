@@ -26,6 +26,7 @@ var sprite: Sprite2D
 var collision_shape: CollisionShape2D
 var vfx: VehicleVFX
 var skid_marks: SkidMarkManager
+var audio: VehicleAudio
 var is_drifting := false
 var is_boosting := false
 var frame_width := 46
@@ -74,6 +75,11 @@ func setup(source_track, id: String, player_controlled: bool = true, color: Stri
 	var shape := RectangleShape2D.new()
 	shape.size = Vector2(frame_width * 0.56, frame_height * 0.56)
 	collision_shape.shape = shape
+	if player_controlled and audio == null:
+		audio = VehicleAudio.new()
+		audio.name = "VehicleAudio"
+		add_child(audio)
+		audio.start()
 	last_valid_position = global_position
 	_update_sprite_frame()
 
@@ -167,6 +173,8 @@ func _physics_process(delta: float) -> void:
 	_drift_was_active = is_drifting
 	if vfx != null:
 		vfx.update_state(delta, heading, is_drifting, is_boosting, velocity.length())
+	if audio != null:
+		audio.update_state(speed_ratio, float(controls["throttle"]), is_drifting, is_boosting, current_surface)
 	if is_drifting and skid_marks != null:
 		skid_marks.record_vehicle(get_instance_id(), global_position, heading, frame_width * 0.16, clampf(absf(lateral_speed) / 70.0, 0.35, 1.0))
 	_update_sprite_frame()
@@ -247,3 +255,7 @@ func _ensure_skid_manager() -> void:
 	skid_marks = SkidMarkManager.new()
 	skid_marks.name = "SkidMarkManager"
 	get_tree().current_scene.add_child(skid_marks)
+
+func _exit_tree() -> void:
+	if audio != null:
+		audio.stop()
