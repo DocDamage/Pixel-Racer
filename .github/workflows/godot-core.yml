@@ -107,17 +107,41 @@ jobs:
       - name: Export Windows release and reject script errors
         shell: bash
         run: |
-          set -o pipefail
           mkdir -p build
+          set +e
           /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
-            --headless --path . --export-release "Windows Desktop" build/PixelTrackWorks.exe 2>&1 | tee /tmp/godot-export.log
-          if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script' /tmp/godot-export.log; then
+            --headless --path . --export-release "Windows Desktop" build/PixelTrackWorks.exe \
+            > /tmp/godot-export.log 2>&1
+          export_code=$?
+          set -e
+
+          echo '--- Godot Windows export tail ---'
+          tail -n 120 /tmp/godot-export.log || true
+          echo '--- Godot Windows export error matches ---'
+          grep -nE 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script|ERROR:|Export failed|Cannot export' /tmp/godot-export.log || true
+
+          if [ "$export_code" -ne 0 ]; then
+            echo "Godot export exited with code $export_code." >&2
+            exit "$export_code"
+          fi
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script' /tmp/godot-export.log; then
             echo 'Godot reported a script error during export.' >&2
             exit 1
           fi
           test -s build/PixelTrackWorks.exe
           cd build
           zip -9 PixelTrackWorks-Windows-x64.zip PixelTrackWorks.exe
+
+      - name: Upload export diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PixelTrackWorks-export-diagnostics
+          path: |
+            /tmp/godot-export-import.log
+            /tmp/godot-export.log
+          if-no-files-found: warn
+          retention-days: 3
 
       - name: Verify packaged Windows artifact
         run: |
