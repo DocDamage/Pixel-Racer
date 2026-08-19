@@ -33,21 +33,35 @@ func decorate(track: TrackData, rng: RandomNumberGenerator, density: float = 0.4
 			continue
 		var directions: Array[Vector2i] = CARDINALS.duplicate()
 		_shuffle_directions(directions, rng)
+		var prefer_barrier: bool = is_corner and rng.randf() < 0.68
+		var did_place := false
 		for direction in directions:
-			var tire_cell: Vector2i = road_cell + direction
-			if _safe_cell(track, tire_cell, occupied, 0):
-				track.add_object("tire", tire_cell, 0, {"generated": true})
-				occupied[tire_cell] = true
-				placed += 1
-				break
-			var barrier_cell: Vector2i = road_cell + direction * 2
-			if _safe_cell(track, barrier_cell, occupied, 1):
-				var barrier_type: String = BARRIER_TYPES[rng.randi_range(0, BARRIER_TYPES.size() - 1)]
-				var rotation_steps: int = 0 if direction.x != 0 else 1
-				track.add_object(barrier_type, barrier_cell, rotation_steps, {"generated": true})
-				occupied[barrier_cell] = true
-				placed += 1
-				break
+			if prefer_barrier:
+				var barrier_cell: Vector2i = road_cell + direction * 2
+				if _safe_cell(track, barrier_cell, occupied, 1):
+					var barrier_type: String = BARRIER_TYPES[rng.randi_range(0, BARRIER_TYPES.size() - 1)]
+					var rotation_steps: int = 0 if direction.x != 0 else 1
+					track.add_object(barrier_type, barrier_cell, rotation_steps, {"generated": true})
+					occupied[barrier_cell] = true
+					placed += 1
+					did_place = true
+					break
+			else:
+				var tire_cell: Vector2i = road_cell + direction
+				if _safe_cell(track, tire_cell, occupied, 0):
+					track.add_object("tire", tire_cell, 0, {"generated": true})
+					occupied[tire_cell] = true
+					placed += 1
+					did_place = true
+					break
+		if not did_place and prefer_barrier:
+			for direction in directions:
+				var fallback_tire: Vector2i = road_cell + direction
+				if _safe_cell(track, fallback_tire, occupied, 0):
+					track.add_object("tire", fallback_tire, 0, {"generated": true})
+					occupied[fallback_tire] = true
+					placed += 1
+					break
 	track.metadata["generated_scenery_count"] = placed
 	return placed
 
