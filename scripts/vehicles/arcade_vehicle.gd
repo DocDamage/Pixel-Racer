@@ -5,6 +5,7 @@ signal nitro_changed(value: float)
 signal drift_score_changed(value: float)
 signal surface_changed(surface: String)
 
+const SettingsAccessScript = preload("res://scripts/utilities/settings_access.gd")
 const SURFACES := {
 	"asphalt": {"grip": 1.0, "resistance": 0.04, "speed": 1.0},
 	"grass": {"grip": 0.48, "resistance": 0.36, "speed": 0.58},
@@ -122,10 +123,10 @@ func _physics_process(delta: float) -> void:
 	var max_speed := lerpf(250.0, 520.0, speed_stat) * float(surface_data["speed"]) * final_drive
 	var engine_power := lerpf(210.0, 480.0, accel_stat) / maxf(0.85, final_drive)
 	var brake_power := lerpf(360.0, 620.0, handling_stat) * float(tuning.get("brake_bias", 1.0))
-	var steering_rate := lerpf(1.65, 2.9, handling_stat) * float(SettingsManager.get_value("steering_sensitivity", 1.0)) * float(tuning.get("steering", 1.0))
-	if bool(SettingsManager.get_value("auto_accelerate", false)) and float(controls["throttle"]) <= 0.0:
+	var steering_rate := lerpf(1.65, 2.9, handling_stat) * float(SettingsAccessScript.get_value("steering_sensitivity", 1.0)) * float(tuning.get("steering", 1.0))
+	if bool(SettingsAccessScript.get_value("auto_accelerate", false)) and float(controls["throttle"]) <= 0.0:
 		controls["throttle"] = 1.0
-	if input_enabled and bool(SettingsManager.get_value("auto_brake", false)) and absf(float(controls["steer"])) > 0.68 and absf(forward_speed) > max_speed * 0.68:
+	if input_enabled and bool(SettingsAccessScript.get_value("auto_brake", false)) and absf(float(controls["steer"])) > 0.68 and absf(forward_speed) > max_speed * 0.68:
 		controls["brake"] = maxf(float(controls["brake"]), 0.28)
 	forward_speed += float(controls["throttle"]) * engine_power * delta
 	if float(controls["brake"]) > 0.0:
@@ -139,9 +140,9 @@ func _physics_process(delta: float) -> void:
 	var grip := lerpf(4.4, 9.5, handling_stat) * float(surface_data["grip"]) * float(tuning.get("grip_bias", 1.0))
 	if is_handbrake:
 		var tuning_drift_assist := float(tuning.get("drift_assist", 0.5))
-		var accessibility_drift_assist := float(SettingsManager.get_value("drift_assist", 0.5)) if input_enabled else 0.5
+		var accessibility_drift_assist := float(SettingsAccessScript.get_value("drift_assist", 0.5)) if input_enabled else 0.5
 		grip *= lerpf(0.22, 0.52, drift_stat) * lerpf(0.80, 1.14, tuning_drift_assist) * lerpf(0.86, 1.08, accessibility_drift_assist)
-	elif bool(SettingsManager.get_value("traction_assist", true)) and input_enabled:
+	elif bool(SettingsAccessScript.get_value("traction_assist", true)) and input_enabled:
 		grip *= 1.12
 	lateral_speed = move_toward(lateral_speed, 0.0, absf(lateral_speed) * grip * delta)
 	var speed_ratio := clampf(absf(forward_speed) / maxf(1.0, max_speed), 0.0, 1.0)
@@ -194,7 +195,7 @@ func _read_controls() -> Dictionary:
 	if not input_enabled:
 		return _ai_controls.duplicate(true)
 	var boost_requested := Input.is_action_pressed("boost")
-	if not bool(SettingsManager.get_value("hold_to_boost", true)):
+	if not bool(SettingsAccessScript.get_value("hold_to_boost", true)):
 		if Input.is_action_just_pressed("boost"):
 			_boost_toggle = not _boost_toggle
 		boost_requested = _boost_toggle
@@ -216,7 +217,7 @@ func _update_surface() -> void:
 		last_valid_position = track.cell_to_world(cell)
 
 func _apply_track_edge_assist(delta: float) -> void:
-	if not input_enabled or not bool(SettingsManager.get_value("track_edge_assist", false)) or current_surface != "grass":
+	if not input_enabled or not bool(SettingsAccessScript.get_value("track_edge_assist", false)) or current_surface != "grass":
 		return
 	var cell: Vector2i = track.world_to_cell(global_position)
 	var nearest: Vector2i = track.nearest_road_cell(cell, 2)
@@ -246,9 +247,9 @@ func _update_sprite_frame() -> void:
 	sprite.region_rect = Rect2(frame * frame_width, 0, frame_width, frame_height)
 
 func _rumble(strength: float, duration: float) -> void:
-	if not input_enabled or not bool(SettingsManager.get_value("controller_vibration", true)):
+	if not input_enabled or not bool(SettingsAccessScript.get_value("controller_vibration", true)):
 		return
-	var configured := clampf(float(SettingsManager.get_value("vibration_strength", 0.75)), 0.0, 1.0)
+	var configured := clampf(float(SettingsAccessScript.get_value("vibration_strength", 0.75)), 0.0, 1.0)
 	var magnitude := clampf(strength * configured, 0.0, 1.0)
 	if magnitude <= 0.01:
 		return
