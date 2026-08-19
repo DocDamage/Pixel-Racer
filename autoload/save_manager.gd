@@ -25,10 +25,7 @@ func save_track(track) -> bool:
 	file.close()
 	if FileAccess.file_exists(final_path):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(final_path))
-	var error := DirAccess.rename_absolute(
-		ProjectSettings.globalize_path(temp_path),
-		ProjectSettings.globalize_path(final_path)
-	)
+	var error := DirAccess.rename_absolute(ProjectSettings.globalize_path(temp_path), ProjectSettings.globalize_path(final_path))
 	return error == OK
 
 func load_track(track_id: String):
@@ -58,17 +55,19 @@ func list_tracks() -> Array[Dictionary]:
 		if dir.current_is_dir() and not name.begins_with("."):
 			var track = load_track(name)
 			if track != null:
-				results.append({
-					"track_id": track.track_id,
-					"name": track.name,
-					"metadata": track.metadata.duplicate(true)
-				})
+				results.append({"track_id": track.track_id, "name": track.name, "metadata": track.metadata.duplicate(true)})
 		name = dir.get_next()
 	dir.list_dir_end()
-	results.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return str(a["name"]).naturalnocasecmp_to(str(b["name"])) < 0
-	)
+	results.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return str(a["name"]).naturalnocasecmp_to(str(b["name"])) < 0)
 	return results
+
+func delete_track(track_id: String) -> bool:
+	if track_id.is_empty():
+		return false
+	var path := "%s/%s" % [TRACK_ROOT, track_id]
+	if not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(path)):
+		return false
+	return _remove_tree(path)
 
 func export_track(track) -> String:
 	if track == null:
@@ -93,6 +92,28 @@ func import_track(path: String):
 	if save_track(track):
 		return track
 	return null
+
+func _remove_tree(path: String) -> bool:
+	var absolute := ProjectSettings.globalize_path(path)
+	var dir := DirAccess.open(absolute)
+	if dir == null:
+		return false
+	dir.list_dir_begin()
+	var name := dir.get_next()
+	while not name.is_empty():
+		if name != "." and name != "..":
+			var child := path.path_join(name)
+			if dir.current_is_dir():
+				if not _remove_tree(child):
+					dir.list_dir_end()
+					return false
+			else:
+				if DirAccess.remove_absolute(ProjectSettings.globalize_path(child)) != OK:
+					dir.list_dir_end()
+					return false
+		name = dir.get_next()
+	dir.list_dir_end()
+	return DirAccess.remove_absolute(absolute) == OK
 
 func _ensure_directory(path: String) -> void:
 	var absolute := ProjectSettings.globalize_path(path)
