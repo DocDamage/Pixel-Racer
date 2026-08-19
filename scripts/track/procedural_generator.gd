@@ -1,14 +1,18 @@
 extends RefCounted
 class_name ProceduralTrackGenerator
 
-func generate(seed_value: int = 0, map_size: int = 48, style: String = "circuit") -> TrackData:
+func generate(seed_value: int = 0, map_size: int = 48, style: String = "circuit", complexity: float = 0.55, road_width: String = "standard", scenery_density: float = 0.45) -> TrackData:
 	var rng := RandomNumberGenerator.new()
 	if seed_value == 0:
 		rng.randomize()
 	else:
 		rng.seed = seed_value
+	var resolved_style: String = style if style in ["circuit", "mixed", "rally", "oval", "technical"] else "circuit"
+	var resolved_width: String = road_width if road_width in TrackData.ROAD_WIDTHS else "standard"
+	var resolved_complexity: float = clampf(complexity, 0.0, 1.0)
+	var resolved_scenery: float = clampf(scenery_density, 0.0, 1.0)
 	var track := TrackData.new()
-	track.name = "Generated %s %04d" % [style.capitalize(), rng.randi_range(0, 9999)]
+	track.name = "Generated %s %04d" % [resolved_style.capitalize(), rng.randi_range(0, 9999)]
 	track.width = clampi(map_size, 24, 96)
 	track.height = track.width
 	var left := rng.randi_range(5, 8)
@@ -16,7 +20,9 @@ func generate(seed_value: int = 0, map_size: int = 48, style: String = "circuit"
 	var right := track.width - rng.randi_range(6, 9)
 	var bottom := track.height - rng.randi_range(6, 9)
 	_draw_rect_loop(track, left, top, right, bottom)
-	_add_safe_detours(track, rng, left, top, right, bottom, rng.randi_range(2, 4))
+	var detour_count: int = _detour_count(resolved_style, resolved_complexity, rng)
+	_add_safe_detours(track, rng, left, top, right, bottom, detour_count)
+	_apply_width(track, resolved_width)
 	var start := track.nearest_road_cell(Vector2i((left + right) / 2, bottom), 8)
 	if start.x < 0:
 		start = track.road_cells()[0]
@@ -30,10 +36,15 @@ func generate(seed_value: int = 0, map_size: int = 48, style: String = "circuit"
 		var cell := track.nearest_road_cell(checkpoint_candidates[index], 8)
 		if cell.x >= 0:
 			track.place_race_object("checkpoint", cell, index)
-	_apply_road_surface_style(track, rng, style)
+	_apply_road_surface_style(track, rng, resolved_style)
 	_add_terrain_variation(track, rng, left, top, right, bottom)
+	var scenery_count: int = SceneryGenerator.new().decorate(track, rng, resolved_scenery)
 	track.metadata["generator_seed"] = rng.seed
-	track.metadata["generator_style"] = style
+	track.metadata["generator_style"] = resolved_style
+	track.metadata["generator_complexity"] = resolved_complexity
+	track.metadata["generator_road_width"] = resolved_width
+	track.metadata["generator_scenery_density"] = resolved_scenery
+	track.metadata["generated_scenery_count"] = scenery_count
 	track.metadata.merge(TrackRating.new().calculate(track), true)
 	track.dirty = true
 	return track
@@ -57,6 +68,24 @@ func create_demo_track() -> TrackData:
 	track.metadata.merge(TrackRating.new().calculate(track), true)
 	track.dirty = false
 	return track
+
+func _detour_count(style: String, complexity: float, rng: RandomNumberGenerator) -> int:
+	if style == "oval":
+		return 0
+	var minimum := 1
+	var maximum := 4
+	if style == "technical":
+		minimum = 3
+		maximum = 4
+	elif style == "rally":
+		minimum = 2
+		maximum = 4
+	var target: int = roundi(lerpf(float(minimum), float(maximum), complexity))
+	return clampi(target + rng.randi_range(-1, 1), minimum, maximum)
+
+func _apply_width(track: TrackData, road_width: String) -> void:
+	for cell in track.road_cells():
+		track.set_road_width(cell, road_width)
 
 func _draw_rect_loop(track: TrackData, left: int, top: int, right: int, bottom: int) -> void:
 	for x in range(left, right + 1):
@@ -135,8 +164,9 @@ func _apply_road_surface_style(track: TrackData, rng: RandomNumberGenerator, sty
 		return
 	var percentage := 0.0
 	match style:
-		"rally": percentage = 0.42
-		"mixed": percentage = 0.18
+		"rally": percentage = 0.52
+		"mixed": percentage = 0.22
+		"technical": percentage = 0.10
 		_: percentage = 0.0
 	if percentage <= 0.0:
 		return
