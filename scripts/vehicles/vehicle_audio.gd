@@ -1,6 +1,7 @@
 extends Node
 class_name VehicleAudio
 
+const SettingsAccessScript = preload("res://scripts/utilities/settings_access.gd")
 const MIX_RATE := 22050.0
 const BUFFER_LENGTH := 0.16
 
@@ -176,8 +177,8 @@ func _fill_buffer() -> void:
 	var boost_level := 0.09 if boosting else 0.0
 	if profile == "electric":
 		boost_level *= 1.25
-	var sfx_volume := clampf(float(SettingsManager.get_value("sfx_volume", 0.9)), 0.0, 1.0)
-	var master_volume := clampf(float(SettingsManager.get_value("master_volume", 1.0)), 0.0, 1.0)
+	var sfx_volume := clampf(float(SettingsAccessScript.get_value("sfx_volume", 0.9)), 0.0, 1.0)
+	var master_volume := clampf(float(SettingsAccessScript.get_value("master_volume", 1.0)), 0.0, 1.0)
 	var engine_level := lerpf(0.045, 0.095, throttle) * lerpf(0.72, 1.0, clampf(speed_ratio, 0.0, 1.0)) * engine_gain
 	for _index in range(frames_available):
 		var engine_sample := sin(phase * TAU) * engine_level
