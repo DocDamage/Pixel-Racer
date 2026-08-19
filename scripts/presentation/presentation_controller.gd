@@ -11,6 +11,7 @@ var dialogue_state_store := DialogueStateStore.new()
 
 var _game_root: Node = null
 var _race_controller: RaceController = null
+var _sfx: GameSFXController = null
 var _last_mode: String = ""
 var _last_validation_key: String = ""
 var _builder_hint_cooldown_msec: int = 0
@@ -39,12 +40,14 @@ func _ready() -> void:
 	race_radio.name = "RaceRadioController"
 	add_child(race_radio)
 	race_radio.setup(dialogue_manager)
-	call_deferred("_bind_game_root")
+	call_deferred("_bind_runtime_services")
 
 func _process(_delta: float) -> void:
 	if _game_root == null or not is_instance_valid(_game_root):
 		_bind_game_root()
 		return
+	if _sfx == null or not is_instance_valid(_sfx):
+		_bind_sfx()
 	var current_mode: String = str(GameState.current_mode)
 	if current_mode != _last_mode:
 		_on_mode_changed(_last_mode, current_mode)
@@ -63,6 +66,10 @@ func character_assets_ready() -> bool:
 func character_asset_issues() -> Array[String]:
 	return character_catalog.validation_issues()
 
+func _bind_runtime_services() -> void:
+	_bind_game_root()
+	_bind_sfx()
+
 func _bind_game_root() -> void:
 	var parent_node: Node = get_parent()
 	if parent_node != null and parent_node.has_method("race_state"):
@@ -73,6 +80,11 @@ func _bind_game_root() -> void:
 			_game_root = current_scene
 	if _game_root != null:
 		_last_mode = str(GameState.current_mode)
+
+func _bind_sfx() -> void:
+	var candidate: Node = get_tree().get_first_node_in_group("game_sfx")
+	if candidate is GameSFXController:
+		_sfx = candidate as GameSFXController
 
 func _bind_race_controller() -> void:
 	if _game_root == null:
@@ -86,6 +98,8 @@ func _bind_race_controller() -> void:
 		return
 	if not _race_controller.countdown_changed.is_connected(_on_countdown_changed):
 		_race_controller.countdown_changed.connect(_on_countdown_changed)
+	if not _race_controller.checkpoint_changed.is_connected(_on_checkpoint_changed):
+		_race_controller.checkpoint_changed.connect(_on_checkpoint_changed)
 	if not _race_controller.lap_completed.is_connected(_on_lap_completed):
 		_race_controller.lap_completed.connect(_on_lap_completed)
 	if not _race_controller.race_finished.is_connected(_on_race_finished):
@@ -99,6 +113,8 @@ func _disconnect_race_controller() -> void:
 		return
 	if _race_controller.countdown_changed.is_connected(_on_countdown_changed):
 		_race_controller.countdown_changed.disconnect(_on_countdown_changed)
+	if _race_controller.checkpoint_changed.is_connected(_on_checkpoint_changed):
+		_race_controller.checkpoint_changed.disconnect(_on_checkpoint_changed)
 	if _race_controller.lap_completed.is_connected(_on_lap_completed):
 		_race_controller.lap_completed.disconnect(_on_lap_completed)
 	if _race_controller.race_finished.is_connected(_on_race_finished):
@@ -124,15 +140,31 @@ func _on_mode_changed(_previous_mode: String, current_mode: String) -> void:
 
 func _on_countdown_changed(value: int) -> void:
 	if value == 0:
+		if _sfx != null:
+			_sfx.play_go()
 		race_radio.on_go()
+	elif value > 0 and _sfx != null:
+		_sfx.play_countdown_tick()
+
+func _on_checkpoint_changed(index: int, _total: int) -> void:
+	if index > 0 and _sfx != null:
+		_sfx.play_checkpoint()
 
 func _on_lap_completed(_lap_number: int, lap_time: float) -> void:
 	if _race_controller == null:
 		return
-	if is_equal_approx(lap_time, _race_controller.best_lap):
+	var is_best: bool = is_equal_approx(lap_time, _race_controller.best_lap)
+	if _sfx != null:
+		if is_best:
+			_sfx.play_new_record()
+		else:
+			_sfx.play_lap_complete()
+	if is_best:
 		race_radio.on_new_best_lap(lap_time)
 
 func _on_race_finished(_total_time: float) -> void:
+	if _sfx != null:
+		_sfx.play_finish()
 	var state: Dictionary = _race_state()
 	var position: int = int(state.get("position", 1))
 	var field_size: int = int(state.get("racers", 1))
@@ -157,6 +189,8 @@ func _on_race_finished(_total_time: float) -> void:
 	})
 
 func _on_event_failed(reason: String) -> void:
+	if _sfx != null:
+		_sfx.play_invalid()
 	dialogue_manager.queue_dict({
 		"id": "event_failed_%s" % reason.to_lower().replace(" ", "_"),
 		"speaker_id": "crew_chief",
@@ -224,6 +258,8 @@ func _check_builder_validation() -> void:
 		return
 	_last_validation_key = key
 	_builder_hint_cooldown_msec = now_msec + 12000
+	if _sfx != null:
+		_sfx.play_invalid()
 	dialogue_manager.queue_dict({
 		"id": "builder_validation_%s" % str(key.hash()),
 		"speaker_id": "builder",
