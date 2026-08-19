@@ -15,7 +15,6 @@ var boosting := false
 var surface := "asphalt"
 var impact_envelope := 0.0
 var enabled := false
-var collision_fx: CollisionFX
 
 func start() -> void:
 	if enabled:
@@ -31,7 +30,6 @@ func start() -> void:
 	add_child(player)
 	player.play()
 	playback = player.get_stream_playback() as AudioStreamGeneratorPlayback
-	_ensure_collision_fx()
 	_fill_buffer()
 
 func stop() -> void:
@@ -49,18 +47,7 @@ func update_state(normalized_speed: float, throttle_input: float, is_drifting: b
 	_fill_buffer()
 
 func trigger_impact(strength: float) -> void:
-	var resolved := clampf(strength, 0.0, 1.0)
-	impact_envelope = maxf(impact_envelope, resolved)
-	if resolved <= 0.01:
-		return
-	_ensure_collision_fx()
-	if collision_fx == null:
-		return
-	var vehicle := get_parent() as ArcadeVehicle
-	if vehicle == null:
-		return
-	var away := -vehicle.velocity.normalized() if vehicle.velocity.length_squared() > 1.0 else Vector2.UP.rotated(vehicle.heading + PI)
-	collision_fx.emit_impact(vehicle.global_position, away, resolved)
+	impact_envelope = maxf(impact_envelope, clampf(strength, 0.0, 1.0))
 
 func _process(delta: float) -> void:
 	if enabled:
@@ -85,6 +72,7 @@ func _fill_buffer() -> void:
 		tire_level = 0.045
 	var boost_level := 0.09 if boosting else 0.0
 	var sfx_volume := clampf(float(SettingsManager.get_value("sfx_volume", 0.9)), 0.0, 1.0)
+	var master_volume := clampf(float(SettingsManager.get_value("master_volume", 1.0)), 0.0, 1.0)
 	var engine_level := lerpf(0.045, 0.095, throttle) * lerpf(0.72, 1.0, clampf(speed_ratio, 0.0, 1.0))
 	for _index in range(frames_available):
 		var engine_sample := sin(phase * TAU) * engine_level
@@ -93,20 +81,7 @@ func _fill_buffer() -> void:
 		var boost_sample := sin(harmonic_phase * TAU * 1.91) * boost_level
 		var impact_noise := randf_range(-1.0, 1.0) * impact_envelope * 0.26
 		var impact_thump := sin(phase * TAU * 0.37) * impact_envelope * 0.16
-		var sample := clampf((engine_sample + tire_sample + boost_sample + impact_noise + impact_thump) * sfx_volume, -0.48, 0.48)
+		var sample := clampf((engine_sample + tire_sample + boost_sample + impact_noise + impact_thump) * sfx_volume * master_volume, -0.48, 0.48)
 		playback.push_frame(Vector2(sample, sample))
 		phase = fposmod(phase + base_increment, 1.0)
 		harmonic_phase = fposmod(harmonic_phase + harmonic_increment, 1.0)
-
-func _ensure_collision_fx() -> void:
-	if collision_fx != null and is_instance_valid(collision_fx):
-		return
-	var existing := get_tree().get_first_node_in_group("collision_fx")
-	if existing is CollisionFX:
-		collision_fx = existing
-		return
-	if get_tree().current_scene == null:
-		return
-	collision_fx = CollisionFX.new()
-	collision_fx.name = "CollisionFX"
-	get_tree().current_scene.add_child(collision_fx)
