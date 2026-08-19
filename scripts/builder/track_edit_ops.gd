@@ -21,7 +21,7 @@ func capture(track: TrackData, first: Vector2i, second: Vector2i) -> Dictionary:
 				clip["roads"].append(road)
 			var terrain_key := "%d,%d" % [cell.x, cell.y]
 			if track.terrain.has(terrain_key):
-				var terrain := track.terrain[terrain_key].duplicate(true)
+				var terrain: Dictionary = Dictionary(track.terrain[terrain_key]).duplicate(true)
 				terrain["rx"] = rel.x
 				terrain["ry"] = rel.y
 				clip["terrain"].append(terrain)
