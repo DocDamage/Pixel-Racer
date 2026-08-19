@@ -11,6 +11,8 @@ var elimination_manager: EliminationManager
 var ai_nodes: Array[AIDriver] = []
 var ai_vehicles: Array[ArcadeVehicle] = []
 var ghost := GhostRecorder.new()
+var ghost_manager := GhostManager.new()
+var best_ghost: GhostPlayer = null
 var validator := TrackValidator.new()
 var career := CareerManager.new()
 var garage := GarageManager.new()
@@ -151,11 +153,12 @@ func start_event(mode: String = "circuit", laps_override: int = 0, ai_override: 
 	GameState.set_mode(GameState.MODE_RACE)
 	active_race_mode = mode
 	_spawn_player(false)
+	if mode == "time_trial":
+		_prepare_best_ghost()
 	_spawn_ai(ai_count)
 	_create_race_controller(laps, mode, true)
 	if mode == "elimination":
 		_create_elimination_manager(float(preset.get("elimination_interval", 20.0)))
-	ghost.start()
 	if ui != null:
 		ui.show_race(str(preset.get("name", mode.to_upper())))
 	return true
@@ -208,11 +211,15 @@ func export_current_package() -> String:
 
 func track_library_entries() -> Array[Dictionary]:
 	var entries := SaveManager.list_tracks()
+	var records := RecordManager.new()
 	for entry in entries:
-		entry["preview_path"] = "user://tracks/%s/preview.png" % str(entry["track_id"])
-		var loaded = SaveManager.load_track(str(entry["track_id"]))
+		var track_id := str(entry["track_id"])
+		entry["preview_path"] = "user://tracks/%s/preview.png" % track_id
+		var loaded = SaveManager.load_track(track_id)
 		if loaded != null:
 			entry["rating"] = TrackRating.new().calculate(loaded)
+		entry["records"] = records.records_for_track(track_id)
+		entry["ghosts"] = ghost_manager.records_for_track(track_id)
 	return entries
 
 func select_vehicle(vehicle_id: String) -> bool:
@@ -265,12 +272,17 @@ func validate_track() -> Dictionary:
 func race_state() -> Dictionary:
 	if player == null or not is_instance_valid(player):
 		return {}
+	var player_cell := track.world_to_cell(player.global_position)
 	var state := {
 		"mode": active_race_mode,
-		"speed": roundi(player.velocity.length() * 0.42),
+		"speed": roundi(player.velocity.length() * RaceController.DISPLAY_SPEED_SCALE),
 		"nitro": player.nitro,
 		"drift": player.drift_score,
 		"surface": player.current_surface,
+		"route": track.get_route_id(player_cell) if track.has_road(player_cell) else "off_track",
+		"pit": false,
+		"pit_limit": 0.0,
+		"penalty": 0.0,
 		"lap": 0,
 		"laps": 0,
 		"checkpoint": 0,
@@ -287,6 +299,9 @@ func race_state() -> Dictionary:
 		state["time"] = race_controller.current_lap_time()
 		state["best"] = race_controller.best_lap
 		state["remaining"] = race_controller.remaining_time()
+		state["pit"] = race_controller.in_pit_lane
+		state["pit_limit"] = race_controller.pit_speed_limit
+		state["penalty"] = race_controller.time_penalty
 	if elimination_manager != null and is_instance_valid(elimination_manager):
 		state["remaining"] = elimination_manager.remaining
 		state["racers"] = elimination_manager.racers.size()
@@ -304,6 +319,21 @@ func _spawn_player(player_controlled: bool) -> void:
 	player.setup(track, GameState.current_vehicle_id, player_controlled)
 	camera.position = player.global_position
 	camera.zoom = Vector2.ONE
+
+func _prepare_best_ghost() -> void:
+	if track == null or player == null:
+		return
+	if not ghost_manager.best_ghost_exists(track.track_id, player.vehicle_id, active_race_mode):
+		return
+	best_ghost = GhostPlayer.new()
+	best_ghost.name = "BestLapGhost"
+	add_child(best_ghost)
+	var path := ghost_manager.best_ghost_path(track.track_id, player.vehicle_id, active_race_mode)
+	if not best_ghost.setup(player.vehicle_id, path, garage.selected_color(player.vehicle_id)):
+		best_ghost.queue_free()
+		best_ghost = null
+		return
+	best_ghost.visible = false
 
 func _spawn_ai(count: int) -> void:
 	if count <= 0:
@@ -323,7 +353,17 @@ func _spawn_ai(count: int) -> void:
 		var ai := AIDriver.new()
 		ai.name = "AIDriver_%d" % i
 		add_child(ai)
-		ai.setup(vehicle, track, {"aggression": 0.42 + minf(0.45, i * 0.09), "consistency": 0.70 + minf(0.25, i * 0.05), "mistake_rate": maxf(0.01, 0.08 - i * 0.01)})
+		var skill := clampf(float(i + 1) / float(maxi(1, count)), 0.0, 1.0)
+		ai.setup(vehicle, track, {
+			"aggression": lerpf(0.38, 0.88, skill),
+			"consistency": lerpf(0.68, 0.95, skill),
+			"mistake_rate": lerpf(0.10, 0.015, skill),
+			"corner_skill": lerpf(0.58, 0.94, skill),
+			"braking_skill": lerpf(0.55, 0.95, skill),
+			"overtake_bias": lerpf(0.35, 0.9, skill),
+			"line_bias": -0.7 + fmod(float(i) * 0.37, 1.4),
+			"route_id": "main"
+		})
 		ai.enabled = false
 		ai_vehicles.append(vehicle)
 		ai_nodes.append(ai)
@@ -341,6 +381,7 @@ func _create_race_controller(laps: int, mode: String, countdown: bool) -> void:
 	race_controller.lap_completed.connect(_on_lap_completed)
 	race_controller.race_finished.connect(_on_race_finished)
 	race_controller.event_failed.connect(_on_event_failed)
+	race_controller.penalty_changed.connect(_on_penalty_changed)
 	if countdown:
 		race_controller.start_countdown()
 
@@ -360,6 +401,10 @@ func _on_countdown_changed(value: int) -> void:
 	if ui != null:
 		ui.show_countdown("GO!" if value == 0 else str(value))
 	if value == 0:
+		if GameState.current_mode == GameState.MODE_RACE:
+			ghost.start()
+			if best_ghost != null and is_instance_valid(best_ghost):
+				best_ghost.play()
 		if player != null:
 			player.input_enabled = true
 		for ai in ai_nodes:
@@ -368,8 +413,16 @@ func _on_countdown_changed(value: int) -> void:
 			elimination_manager.start()
 
 func _on_lap_completed(lap_number: int, lap_time: float) -> void:
+	if active_race_mode == "time_trial" and track != null and player != null:
+		var saved_best := ghost_manager.save_if_best(track.track_id, player.vehicle_id, active_race_mode, lap_time, ghost.samples, {"track_name": track.name})
+		if saved_best and ui != null:
+			ui.show_status("New best ghost saved: %.2f" % lap_time)
 	if ui != null:
 		ui.show_countdown("LAP %d\n%.2f" % [lap_number, lap_time])
+
+func _on_penalty_changed(_total_penalty: float, message: String) -> void:
+	if ui != null:
+		ui.show_status(message)
 
 func _on_race_finished(total_time: float) -> void:
 	ghost.stop()
@@ -410,6 +463,11 @@ func _on_player_won() -> void:
 		ui.show_result("WINNER", "Last racer standing.")
 
 func _cleanup_race() -> void:
+	ghost.stop()
+	if best_ghost != null and is_instance_valid(best_ghost):
+		best_ghost.stop()
+		best_ghost.queue_free()
+	best_ghost = null
 	if race_controller != null and is_instance_valid(race_controller):
 		race_controller.stop()
 		race_controller.queue_free()
@@ -459,11 +517,13 @@ func _start_position() -> Dictionary:
 	else:
 		cell = track.nearest_road_cell(track.world_to_cell(camera.position))
 	if cell.x < 0:
-		var roads := track.road_cells()
+		var roads := track.get_route_cells("main")
+		if roads.is_empty():
+			roads = track.road_cells()
 		cell = roads[0] if not roads.is_empty() else Vector2i(1, 1)
 	var heading := 0.0
 	var graph := TrackGraph.new()
-	graph.build(track)
+	graph.build(track, "main")
 	var order := graph.find_loop_order(cell)
 	if order.size() > 1:
 		var direction := track.cell_to_world(order[1]) - track.cell_to_world(order[0])
@@ -476,5 +536,7 @@ func _builder_focus_position() -> Vector2:
 	var start := track.get_start_object()
 	if not start.is_empty():
 		return track.cell_to_world(Vector2i(int(start.get("x", 0)), int(start.get("y", 0))))
-	var roads := track.road_cells()
+	var roads := track.get_route_cells("main")
+	if roads.is_empty():
+		roads = track.road_cells()
 	return track.cell_to_world(roads[0]) if not roads.is_empty() else Vector2(640, 500)
