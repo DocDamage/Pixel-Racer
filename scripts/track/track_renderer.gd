@@ -23,7 +23,7 @@ const ROAD_TEXTURE_REDWHITE := preload("res://Tilesets/race_track_1.png")
 const ROAD_TEXTURE_WHITE := preload("res://Tilesets/race_track_2.png")
 const ROAD_TEXTURE_DIRT := preload("res://Tilesets/race_track_3.png")
 
-var track = null
+var track: TrackData = null
 var cursor_cell := Vector2i.ZERO
 var cursor_visible := false
 var cursor_color := Color(0.2, 0.9, 1.0, 0.7)
@@ -32,7 +32,7 @@ var show_grid := true
 var selection_active := false
 var selection_rect := Rect2i()
 
-func set_track(source_track) -> void:
+func set_track(source_track: TrackData) -> void:
 	track = source_track
 	queue_redraw()
 
@@ -53,7 +53,7 @@ func set_selection(rect: Rect2i, active: bool) -> void:
 func _draw() -> void:
 	if track == null:
 		return
-	var size := float(track.cell_size)
+	var size: float = float(track.cell_size)
 	var world_rect := Rect2(Vector2.ZERO, Vector2(track.width * track.cell_size, track.height * track.cell_size))
 	draw_rect(world_rect, COLOR_GRASS)
 	_draw_background_pattern(size)
@@ -85,15 +85,15 @@ func _draw_terrain(size: float) -> void:
 		_draw_terrain_texture(cell, size, type)
 
 func _draw_roads(size: float) -> void:
-	for cell in track.road_cells():
+	for cell: Vector2i in track.road_cells():
 		var road: Dictionary = track.get_road(cell)
-		var center := track.cell_to_world(cell)
+		var center: Vector2 = track.cell_to_world(cell)
 		var mask: int = track.get_road_mask(cell)
-		var surface := track.get_surface_at(cell)
-		var road_color := _surface_color(surface)
+		var surface: String = track.get_surface_at(cell)
+		var road_color: Color = _surface_color(surface)
 		var width_name := str(road.get("width", "standard"))
-		var road_width := size * float(WIDTH_SCALE.get(width_name, WIDTH_SCALE["standard"]))
-		var half := road_width * 0.5
+		var road_width: float = size * float(WIDTH_SCALE.get(width_name, WIDTH_SCALE["standard"]))
+		var half: float = road_width * 0.5
 		draw_rect(Rect2(center - Vector2(half, half), Vector2(road_width, road_width)), road_color, true)
 		if (mask & TrackData.NORTH) != 0:
 			draw_rect(Rect2(Vector2(center.x - half, cell.y * size), Vector2(road_width, size * 0.5)), road_color, true)
@@ -103,8 +103,8 @@ func _draw_roads(size: float) -> void:
 			draw_rect(Rect2(Vector2(cell.x * size, center.y - half), Vector2(size * 0.5, road_width)), road_color, true)
 		if (mask & TrackData.EAST) != 0:
 			draw_rect(Rect2(Vector2(center.x, center.y - half), Vector2(size * 0.5, road_width)), road_color, true)
-		var route_id := track.get_route_id(cell)
-		var used_texture := _draw_road_texture(center, mask, size, road_width, surface, width_name, route_id)
+		var route_id: String = track.get_route_id(cell)
+		var used_texture: bool = _draw_road_texture(center, mask, size, road_width, surface, width_name, route_id)
 		if not used_texture:
 			_draw_curb_hints(center, mask, size, half)
 		if route_id == "pit":
@@ -114,7 +114,7 @@ func _draw_roads(size: float) -> void:
 
 func _draw_terrain_texture(cell: Vector2i, size: float, surface: String) -> void:
 	var texture: Texture2D = null
-	var hash_value := abs(cell.x * 31 + cell.y * 17)
+	var hash_value: int = absi(cell.x * 31 + cell.y * 17)
 	match surface:
 		"grass":
 			match hash_value % 3:
@@ -142,7 +142,7 @@ func _draw_road_texture(center: Vector2, mask: int, size: float, road_width: flo
 	else:
 		return false
 	var source := Rect2(Vector2(SOURCE_TILE_SIZE, 0.0), Vector2.ONE * SOURCE_TILE_SIZE)
-	var rotation := PI * 0.5 if mask == (TrackData.NORTH | TrackData.SOUTH) else 0.0
+	var rotation: float = PI * 0.5 if mask == (TrackData.NORTH | TrackData.SOUTH) else 0.0
 	draw_set_transform(center, rotation, Vector2.ONE)
 	draw_texture_rect_region(texture, Rect2(Vector2(-size * 0.5, -road_width * 0.5), Vector2(size, road_width)), source, Color(1.0, 1.0, 1.0, 0.92))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
@@ -170,9 +170,9 @@ func _draw_route_hint(center: Vector2, mask: int, size: float, color: Color, wid
 	draw_circle(center, 3.5, color)
 
 func _draw_race_objects(size: float) -> void:
-	for item in track.race_objects:
+	for item: Dictionary in track.race_objects:
 		var cell := Vector2i(int(item.get("x", 0)), int(item.get("y", 0)))
-		var center := track.cell_to_world(cell)
+		var center: Vector2 = track.cell_to_world(cell)
 		var type := str(item.get("type", ""))
 		if type == "start_finish":
 			_draw_start_line(center, cell, size)
