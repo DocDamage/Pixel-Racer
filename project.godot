@@ -5,6 +5,7 @@ config_version=5
 [application]
 config/name="Pixel Track Works"
 config/description="Top-down arcade racing and track construction sandbox"
+config/auto_accept_quit=false
 run/main_scene="res://scenes/main/main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
