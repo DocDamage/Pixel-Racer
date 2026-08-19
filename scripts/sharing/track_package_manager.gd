@@ -2,6 +2,7 @@ extends RefCounted
 class_name TrackPackageManager
 
 const PACKAGE_SCHEMA := 1
+const SaveManagerScript = preload("res://autoload/save_manager.gd")
 
 func export_package(track: TrackData, destination_root: String, preview_path: String = "") -> String:
 	if track == null:
@@ -35,13 +36,14 @@ func import_package(package_dir: String):
 	var result := validate_package(package_dir)
 	if not bool(result.get("valid", false)):
 		return null
-	var track = SaveManager.load_track_path(package_dir.path_join("track.json"))
+	var save_manager = SaveManagerScript.new()
+	var track = save_manager.load_track_path(package_dir.path_join("track.json"))
 	if track == null:
 		return null
-	if SaveManager.load_track(track.track_id) != null:
+	if save_manager.load_track(track.track_id) != null:
 		track.track_id = "%s-%s" % [Time.get_unix_time_from_system(), randi_range(100000, 999999)]
 	track.metadata["imported_at"] = Time.get_datetime_string_from_system(true)
-	if not SaveManager.save_track(track):
+	if not save_manager.save_track(track):
 		return null
 	var source_preview := package_dir.path_join("preview.png")
 	if FileAccess.file_exists(source_preview):
