@@ -4,13 +4,13 @@ class_name RaceModeCatalog
 const MODES := {
 	"circuit": {
 		"name": "Circuit",
-		"description": "Three-lap race with ordered checkpoints.",
+		"description": "Multi-lap race with ordered checkpoints.",
 		"laps": 3,
 		"ai_count": 3
 	},
 	"time_trial": {
 		"name": "Time Trial",
-		"description": "Solo one-lap run against the clock.",
+		"description": "Solo one-lap run against the clock and saved records.",
 		"laps": 1,
 		"ai_count": 0
 	},
@@ -34,6 +34,13 @@ const MODES := {
 		"laps": 1,
 		"ai_count": 0,
 		"time_limit": 60.0
+	},
+	"elimination": {
+		"name": "Elimination",
+		"description": "The last racer is removed every 20 seconds until one remains.",
+		"laps": 99,
+		"ai_count": 5,
+		"elimination_interval": 20.0
 	}
 }
 
