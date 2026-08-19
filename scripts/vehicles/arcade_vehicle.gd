@@ -13,7 +13,7 @@ const SURFACES := {
 	"gravel": {"grip": 0.70, "resistance": 0.27, "speed": 0.82}
 }
 
-var track = null
+var track: TrackData = null
 var vehicle_id := "Hachiroku_Drifter"
 var definition: Dictionary = {}
 var input_enabled := true
@@ -51,7 +51,7 @@ func _ready() -> void:
 	add_child(vfx)
 	_ensure_skid_manager()
 
-func setup(source_track, id: String, player_controlled: bool = true, color: String = "default") -> void:
+func setup(source_track: TrackData, id: String, player_controlled: bool = true, color: String = "default") -> void:
 	track = source_track
 	vehicle_id = id
 	input_enabled = player_controlled
@@ -201,8 +201,8 @@ func _read_controls() -> Dictionary:
 	}
 
 func _update_surface() -> void:
-	var cell := track.world_to_cell(global_position)
-	var next_surface := track.get_surface_at(cell) if track.in_bounds(cell) else "grass"
+	var cell: Vector2i = track.world_to_cell(global_position)
+	var next_surface: String = track.get_surface_at(cell) if track.in_bounds(cell) else "grass"
 	if next_surface != current_surface:
 		current_surface = next_surface
 		surface_changed.emit(current_surface)
@@ -212,12 +212,12 @@ func _update_surface() -> void:
 func _apply_track_edge_assist(delta: float) -> void:
 	if not input_enabled or not bool(SettingsManager.get_value("track_edge_assist", false)) or current_surface != "grass":
 		return
-	var cell := track.world_to_cell(global_position)
-	var nearest := track.nearest_road_cell(cell, 2)
+	var cell: Vector2i = track.world_to_cell(global_position)
+	var nearest: Vector2i = track.nearest_road_cell(cell, 2)
 	if nearest.x < 0:
 		return
-	var target := track.cell_to_world(nearest)
-	var correction := target - global_position
+	var target: Vector2 = track.cell_to_world(nearest)
+	var correction: Vector2 = target - global_position
 	if correction.length() > track.cell_size * 2.25 or correction.length() < 1.0:
 		return
 	velocity += correction.normalized() * 95.0 * delta
