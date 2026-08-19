@@ -71,8 +71,8 @@ func route_cells(track: TrackData, route_id: String) -> Array[Vector2i]:
 func route_summary(track: TrackData, route_id: String) -> Dictionary:
 	if track == null:
 		return {}
-	var cells := track.get_route_cells(route_id)
-	var definition := track.route_definition(route_id)
+	var cells: Array[Vector2i] = track.get_route_cells(route_id)
+	var definition: Dictionary = track.route_definition(route_id)
 	var graph := TrackGraph.new()
 	graph.build(track, route_id)
 	var parent := str(definition.get("parent", "main"))
@@ -81,7 +81,7 @@ func route_summary(track: TrackData, route_id: String) -> Dictionary:
 		"type": str(definition.get("type", "alternate")),
 		"parent": parent,
 		"cell_count": cells.size(),
-		"connected": graph.is_connected(),
+		"connected": graph.all_connected(),
 		"simple_path": graph.is_simple_path(),
 		"interfaces": graph.route_interfaces(route_id, parent)
 	}
