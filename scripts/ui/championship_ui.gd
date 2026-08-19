@@ -17,7 +17,13 @@ var panel: PanelContainer
 var list_box: VBoxContainer
 var header: Label
 
+func _ready() -> void:
+	if game == null:
+		setup(get_parent())
+
 func setup(game_root) -> void:
+	if launch_button != null:
+		return
 	game = game_root
 	layer = 25
 	_build()
@@ -26,7 +32,7 @@ func _process(_delta: float) -> void:
 	if game == null or launch_button == null:
 		return
 	var menu_mode := GameState.current_mode == GameState.MODE_MENU
-	launch_button.visible = menu_mode and not game.career.available_championships().is_empty()
+	launch_button.visible = menu_mode and not game.career.available_championships().is_empty() and not panel.visible
 	if not menu_mode and panel.visible:
 		_close()
 
