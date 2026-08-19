@@ -150,7 +150,7 @@ func _add_terrain_variation(track: TrackData, rng: RandomNumberGenerator, left: 
 	var patch_count := rng.randi_range(3, 7)
 	for _patch in range(patch_count):
 		var center := Vector2i(rng.randi_range(left + 1, right - 1), rng.randi_range(top + 1, bottom - 1))
-		var surface := ["sand", "dirt", "gravel"][rng.randi_range(0, 2)]
+		var surface: String = str(["sand", "dirt", "gravel"][rng.randi_range(0, 2)])
 		var radius := rng.randi_range(1, 2)
 		for y in range(center.y - radius, center.y + radius + 1):
 			for x in range(center.x - radius, center.x + radius + 1):
