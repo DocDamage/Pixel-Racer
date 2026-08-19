@@ -19,6 +19,7 @@ func _init() -> void:
 	_test_garage_model()
 	_test_career_model()
 	_test_record_model()
+	_test_ghost_manager()
 	_test_track_package()
 	_test_save_delete()
 	_test_race_mode_catalog()
@@ -155,6 +156,24 @@ func _test_record_model() -> void:
 	_expect(not records.record_lap(test_id, "Hachiroku_Drifter", "time_trial", 45.0), "record manager rejects slower lap")
 	_expect(records.record_score(test_id, "Hachiroku_Drifter", "drift", 1000.0), "record manager accepts drift score")
 	_expect(not records.record_score(test_id, "Hachiroku_Drifter", "drift", 900.0), "record manager rejects lower drift score")
+
+func _test_ghost_manager() -> void:
+	var manager := GhostManager.new()
+	var track_id := "ci-ghost-%s" % Time.get_ticks_msec()
+	var vehicle_id := "Hachiroku_Drifter"
+	var samples: Array[Dictionary] = [
+		{"t": 0.0, "x": 10.0, "y": 20.0, "heading": 0.0, "speed": 0.0},
+		{"t": 1.0, "x": 40.0, "y": 20.0, "heading": 0.3, "speed": 80.0},
+		{"t": 2.0, "x": 80.0, "y": 25.0, "heading": 0.5, "speed": 110.0}
+	]
+	_expect(manager.save_if_best(track_id, vehicle_id, "time_trial", 42.0, samples), "first time-trial ghost is saved")
+	_expect(manager.best_ghost_exists(track_id, vehicle_id), "best ghost file is discoverable")
+	_expect(is_equal_approx(manager.best_ghost_time(track_id, vehicle_id), 42.0), "best ghost exposes lap time")
+	_expect(not manager.save_if_best(track_id, vehicle_id, "time_trial", 44.0, samples), "slower ghost does not replace best")
+	_expect(manager.save_if_best(track_id, vehicle_id, "time_trial", 40.0, samples), "faster ghost replaces best")
+	var recorder := manager.load_recorder(track_id, vehicle_id)
+	_expect(recorder != null and recorder.samples.size() == samples.size(), "best ghost loads into recorder")
+	_expect(manager.delete_best(track_id, vehicle_id), "best ghost can be deleted")
 
 func _test_track_package() -> void:
 	var track := ProceduralTrackGenerator.new().create_demo_track()
