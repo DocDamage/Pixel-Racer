@@ -11,7 +11,17 @@ const COLOR_CURB_RED := Color("#e94b45")
 const COLOR_CURB_WHITE := Color("#f4eadf")
 const COLOR_PIT := Color("#37d9ff")
 const COLOR_ALTERNATE := Color("#ffd166")
+const SOURCE_TILE_SIZE := 64.0
 const WIDTH_SCALE := {"narrow": 0.52, "standard": 0.68, "wide": 0.80, "extra_wide": 0.92}
+const GRASS_TEXTURE_A := preload("res://Tilesets/grass.png")
+const GRASS_TEXTURE_B := preload("res://Tilesets/grass2.png")
+const GRASS_TEXTURE_C := preload("res://Tilesets/grass3.png")
+const DIRT_TEXTURE_A := preload("res://Tilesets/dirt_1.png")
+const DIRT_TEXTURE_B := preload("res://Tilesets/dirt_2.png")
+const SAND_TEXTURE := preload("res://Tilesets/sand_clean.png")
+const ROAD_TEXTURE_REDWHITE := preload("res://Tilesets/race_track_1.png")
+const ROAD_TEXTURE_WHITE := preload("res://Tilesets/race_track_2.png")
+const ROAD_TEXTURE_DIRT := preload("res://Tilesets/race_track_3.png")
 
 var track = null
 var cursor_cell := Vector2i.ZERO
@@ -72,6 +82,7 @@ func _draw_terrain(size: float) -> void:
 		var cell := Vector2i(int(item.get("x", 0)), int(item.get("y", 0)))
 		var type := str(item.get("type", "grass"))
 		draw_rect(Rect2(Vector2(cell) * size, Vector2.ONE * size), _surface_color(type), true)
+		_draw_terrain_texture(cell, size, type)
 
 func _draw_roads(size: float) -> void:
 	for cell in track.road_cells():
@@ -80,7 +91,8 @@ func _draw_roads(size: float) -> void:
 		var mask: int = track.get_road_mask(cell)
 		var surface := track.get_surface_at(cell)
 		var road_color := _surface_color(surface)
-		var road_width := size * float(WIDTH_SCALE.get(str(road.get("width", "standard")), WIDTH_SCALE["standard"]))
+		var width_name := str(road.get("width", "standard"))
+		var road_width := size * float(WIDTH_SCALE.get(width_name, WIDTH_SCALE["standard"]))
 		var half := road_width * 0.5
 		draw_rect(Rect2(center - Vector2(half, half), Vector2(road_width, road_width)), road_color, true)
 		if (mask & TrackData.NORTH) != 0:
@@ -91,12 +103,50 @@ func _draw_roads(size: float) -> void:
 			draw_rect(Rect2(Vector2(cell.x * size, center.y - half), Vector2(size * 0.5, road_width)), road_color, true)
 		if (mask & TrackData.EAST) != 0:
 			draw_rect(Rect2(Vector2(center.x, center.y - half), Vector2(size * 0.5, road_width)), road_color, true)
-		_draw_curb_hints(center, mask, size, half)
 		var route_id := track.get_route_id(cell)
+		var used_texture := _draw_road_texture(center, mask, size, road_width, surface, width_name, route_id)
+		if not used_texture:
+			_draw_curb_hints(center, mask, size, half)
 		if route_id == "pit":
 			_draw_route_hint(center, mask, size, COLOR_PIT, 3.0)
 		elif route_id != "main" and not route_id.is_empty():
 			_draw_route_hint(center, mask, size, COLOR_ALTERNATE, 2.5)
+
+func _draw_terrain_texture(cell: Vector2i, size: float, surface: String) -> void:
+	var texture: Texture2D = null
+	var hash_value := abs(cell.x * 31 + cell.y * 17)
+	match surface:
+		"grass":
+			match hash_value % 3:
+				0: texture = GRASS_TEXTURE_A
+				1: texture = GRASS_TEXTURE_B
+				_: texture = GRASS_TEXTURE_C
+		"dirt":
+			texture = DIRT_TEXTURE_A if hash_value % 2 == 0 else DIRT_TEXTURE_B
+		"sand":
+			texture = SAND_TEXTURE
+		_:
+			return
+	var source := Rect2(Vector2(SOURCE_TILE_SIZE, 0.0), Vector2.ONE * SOURCE_TILE_SIZE)
+	var destination := Rect2(Vector2(cell) * size, Vector2.ONE * size)
+	draw_texture_rect_region(texture, destination, source, Color(1.0, 1.0, 1.0, 0.78))
+
+func _draw_road_texture(center: Vector2, mask: int, size: float, road_width: float, surface: String, width_name: String, route_id: String) -> bool:
+	if width_name != "standard" or mask not in [TrackData.EAST | TrackData.WEST, TrackData.NORTH | TrackData.SOUTH]:
+		return false
+	var texture: Texture2D = null
+	if surface == "asphalt":
+		texture = ROAD_TEXTURE_WHITE if route_id == "pit" else ROAD_TEXTURE_REDWHITE
+	elif surface in ["dirt", "gravel", "sand"]:
+		texture = ROAD_TEXTURE_DIRT
+	else:
+		return false
+	var source := Rect2(Vector2(SOURCE_TILE_SIZE, 0.0), Vector2.ONE * SOURCE_TILE_SIZE)
+	var rotation := PI * 0.5 if mask == (TrackData.NORTH | TrackData.SOUTH) else 0.0
+	draw_set_transform(center, rotation, Vector2.ONE)
+	draw_texture_rect_region(texture, Rect2(Vector2(-size * 0.5, -road_width * 0.5), Vector2(size, road_width)), source, Color(1.0, 1.0, 1.0, 0.92))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	return true
 
 func _draw_curb_hints(center: Vector2, mask: int, size: float, half: float) -> void:
 	var stripe := 3.0
