@@ -35,6 +35,8 @@ This branch establishes the first complete playable vertical slice and the archi
 - Placement cursor and editor camera.
 - Road/terrain painting, erase, Start/Finish, checkpoints, barriers.
 - Undo/redo snapshot stack.
+- Shift-drag region selection.
+- Copy/cut/paste, rotate, mirror, region delete, and eyedropper workflows.
 - Keyboard/mouse and controller input pathways.
 
 ### Phase 6 — Race Logic
@@ -64,6 +66,7 @@ This branch establishes the first complete playable vertical slice and the archi
 - Slip-based drift scoring.
 - Drift-earned nitro.
 - Boost acceleration/top-speed extension.
+- Included smoke and nitro sprite sheets wired as live vehicle VFX.
 
 ### Phase 10 — Vehicle Roster foundation
 - Runtime parser consumes the existing 22-car/4-bike `js/config/vehicleData.js` definitions.
@@ -75,6 +78,14 @@ This branch establishes the first complete playable vertical slice and the archi
 - Steering and corner-speed planning.
 - Basic driver personality variation.
 - Three-opponent Quick Race.
+
+### Phase 13 — Race Modes foundation
+- Circuit rules.
+- One-lap Time Trial rules.
+- Sprint gate-completion rules.
+- Checkpoint Rush countdown and time bonuses.
+- Timed Drift Trial scoring rules.
+- Remaining: race-setup UI wiring and Elimination mode.
 
 ### Phase 14/15 — Garage and Career foundations
 - Garage vehicle selection.
@@ -108,12 +119,11 @@ This branch establishes the first complete playable vertical slice and the archi
 
 The design document's later production scope is intentionally not misrepresented as finished. Remaining release work includes:
 
-- Region selection/copy/paste/mirror and eyedropper UX.
 - Draw-a-track, variable widths, pit lanes, and multi-route circuits.
 - Full object/decor catalog integration.
-- Smoke/skid-mark/nitro VFX using the included VFX sheets.
+- Skid-mark persistence, sparks, and deeper collision/environment VFX.
 - Stronger AI overtaking/avoidance/drafting and full 12-car stress validation.
-- Sprint, Drift Event, Elimination, and Checkpoint race-mode rule sets.
+- Race-setup UI wiring for the implemented rule sets plus Elimination mode.
 - Vehicle purchasing, upgrades, paint UI, and tuning persistence.
 - Full career venue progression, sponsor/championship content, and unlock tables.
 - Track preview PNG capture and richer Track Library cards.

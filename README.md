@@ -15,13 +15,16 @@ No track export, scene reload, or compile step is required to test an edit.
 - Grass, asphalt, sand, dirt, and gravel surface physics.
 - Mouse + keyboard + controller-friendly track construction controls.
 - Road, terrain, Start/Finish, checkpoints, barriers, erase, undo, and redo.
+- Shift-drag region selection with copy/cut/paste, rotate, mirror, delete, and eyedropper workflows.
 - Continuous validation with highlighted invalid cells.
 - Atomic JSON track save/load plus portable JSON export/import services.
 - Instant in-place test drive.
 - 16-direction sprite-sheet vehicle rendering using the bundled vehicle art.
 - Existing vehicle definitions are read from `js/config/vehicleData.js` rather than replaced.
 - Arcade acceleration, braking, reverse, steering, lateral grip, collision response, reset, drift scoring, and nitro.
+- Bundled smoke and nitro sprite sheets animate during drifts and boost.
 - Checkpoint-protected lap timing and best-lap tracking.
+- Data-driven rules for Circuit, Time Trial, Sprint, Checkpoint Rush, and Drift Trial; the current menu Quick Race launches Circuit while the other rules are ready for the race-setup UI pass.
 - Quick Race with generated AI racing-line traversal and three opponents.
 - Procedural valid-loop track generation.
 - Ghost recording/playback data model.
@@ -47,7 +50,12 @@ The intended internal resolution is **640×360** with nearest-neighbor pixel ren
 | Previous / next tool | Q / E | LB / RB |
 | Road / Sand / Dirt / Grass | 1 / 2 / 3 / 4 | toolbar |
 | Start / Checkpoint / Barrier / Erase | 5 / 6 / 7 / 8 | toolbar |
-| Rotate barrier | X | toolbar/context |
+| Select region | Shift + left-drag | — |
+| Copy / Cut / Paste | Ctrl+C / Ctrl+X / Ctrl+V | UI/context later |
+| Rotate / mirror clipboard | R / M | UI/context later |
+| Eyedropper | X / middle mouse | X |
+| Delete selected region | Delete | UI/context later |
+| Rotate barrier | R (when clipboard empty) | toolbar/context |
 | Undo / Redo | Z / Y | UI |
 | Save / Load | F2 / F3 | UI |
 | Test Drive | F5 | Start |
@@ -88,7 +96,7 @@ With a Godot 4.7.x executable available:
 godot --headless --path . --script res://tests/run_tests.gd
 ```
 
-The suite covers smart-road masks, serialization, circuit validation, and deterministic procedural validity.
+The suite covers smart-road masks, serialization, circuit validation, builder clipboard transforms, race-mode presets, and deterministic procedural validity.
 
 ## Repository note
 
