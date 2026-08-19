@@ -9,6 +9,8 @@ const COLOR_SAND := Color("#d4a359")
 const COLOR_GRAVEL := Color("#766d66")
 const COLOR_CURB_RED := Color("#e94b45")
 const COLOR_CURB_WHITE := Color("#f4eadf")
+const COLOR_PIT := Color("#37d9ff")
+const COLOR_ALTERNATE := Color("#ffd166")
 const WIDTH_SCALE := {"narrow": 0.52, "standard": 0.68, "wide": 0.80, "extra_wide": 0.92}
 
 var track = null
@@ -90,8 +92,11 @@ func _draw_roads(size: float) -> void:
 		if (mask & TrackData.EAST) != 0:
 			draw_rect(Rect2(Vector2(center.x, center.y - half), Vector2(size * 0.5, road_width)), road_color, true)
 		_draw_curb_hints(center, mask, size, half)
-		if bool(road.get("is_pit", false)):
-			draw_circle(center, 4.0, Color(0.15, 0.85, 1.0, 0.8))
+		var route_id := track.get_route_id(cell)
+		if route_id == "pit":
+			_draw_route_hint(center, mask, size, COLOR_PIT, 3.0)
+		elif route_id != "main" and not route_id.is_empty():
+			_draw_route_hint(center, mask, size, COLOR_ALTERNATE, 2.5)
 
 func _draw_curb_hints(center: Vector2, mask: int, size: float, half: float) -> void:
 	var stripe := 3.0
@@ -101,6 +106,18 @@ func _draw_curb_hints(center: Vector2, mask: int, size: float, half: float) -> v
 	elif mask in [TrackData.EAST | TrackData.WEST, TrackData.EAST, TrackData.WEST]:
 		draw_line(Vector2(center.x - size * 0.5, center.y - half), Vector2(center.x + size * 0.5, center.y - half), COLOR_CURB_RED, stripe)
 		draw_line(Vector2(center.x - size * 0.5, center.y + half), Vector2(center.x + size * 0.5, center.y + half), COLOR_CURB_WHITE, stripe)
+
+func _draw_route_hint(center: Vector2, mask: int, size: float, color: Color, width: float) -> void:
+	var arm := size * 0.48
+	if (mask & TrackData.NORTH) != 0:
+		draw_line(center, center + Vector2(0, -arm), color, width)
+	if (mask & TrackData.SOUTH) != 0:
+		draw_line(center, center + Vector2(0, arm), color, width)
+	if (mask & TrackData.WEST) != 0:
+		draw_line(center, center + Vector2(-arm, 0), color, width)
+	if (mask & TrackData.EAST) != 0:
+		draw_line(center, center + Vector2(arm, 0), color, width)
+	draw_circle(center, 3.5, color)
 
 func _draw_race_objects(size: float) -> void:
 	for item in track.race_objects:
