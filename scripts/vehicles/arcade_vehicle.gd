@@ -24,6 +24,9 @@ var last_valid_position := Vector2.ZERO
 var current_surface := "asphalt"
 var sprite: Sprite2D
 var collision_shape: CollisionShape2D
+var vfx: VehicleVFX
+var is_drifting := false
+var is_boosting := false
 var frame_width := 46
 var frame_height := 54
 var _ai_controls := {"throttle": 0.0, "brake": 0.0, "steer": 0.0, "handbrake": false, "boost": false}
@@ -37,6 +40,9 @@ func _ready() -> void:
 	collision_shape = CollisionShape2D.new()
 	collision_shape.name = "CollisionShape"
 	add_child(collision_shape)
+	vfx = VehicleVFX.new()
+	vfx.name = "VehicleVFX"
+	add_child(vfx)
 
 func setup(source_track, id: String, player_controlled: bool = true, color: String = "default") -> void:
 	track = source_track
@@ -114,7 +120,8 @@ func _physics_process(delta: float) -> void:
 	var steering_scale := lerpf(0.42, 1.0, clampf(speed_ratio * 2.0, 0.0, 1.0)) * lerpf(1.0, 0.66, maxf(0.0, speed_ratio - 0.75) / 0.25)
 	if absf(forward_speed) > 6.0:
 		heading += float(controls["steer"]) * steering_rate * steering_scale * delta * signf(forward_speed)
-	if bool(controls["boost"]) and nitro > 0.0 and forward_speed > 20.0:
+	is_boosting = bool(controls["boost"]) and nitro > 0.0 and forward_speed > 20.0
+	if is_boosting:
 		forward_speed += lerpf(220.0, 360.0, boost_stat) * delta
 		max_speed *= 1.14
 		nitro = maxf(0.0, nitro - 28.0 * delta)
@@ -126,6 +133,8 @@ func _physics_process(delta: float) -> void:
 		velocity *= 0.68
 	_update_surface()
 	_update_drift(delta, forward_speed, lateral_speed)
+	if vfx != null:
+		vfx.update_state(delta, heading, is_drifting, is_boosting, velocity.length())
 	_update_sprite_frame()
 	if input_enabled and Input.is_action_just_pressed("reset_vehicle"):
 		reset_to_last_valid()
@@ -152,7 +161,8 @@ func _update_surface() -> void:
 
 func _update_drift(delta: float, forward_speed: float, lateral_speed: float) -> void:
 	var slip := absf(lateral_speed)
-	if absf(forward_speed) > 90.0 and slip > 18.0:
+	is_drifting = absf(forward_speed) > 90.0 and slip > 18.0
+	if is_drifting:
 		var gain := slip * absf(forward_speed) * delta * 0.002
 		drift_score += gain
 		nitro = minf(100.0, nitro + gain * 0.12)
