@@ -82,8 +82,7 @@ func update_state(state: Dictionary) -> void:
 			"text": "Final lap. No saving anything now.",
 			"event": "final_lap",
 			"priority": 85,
-			"duration": 2.5,
-			"once_only": true
+			"duration": 2.5
 		})
 
 	if in_pit and not _last_pit:
@@ -142,8 +141,7 @@ func update_state(state: Dictionary) -> void:
 			"text": "%d cars left. Do not be the next cut." % racers,
 			"event": "elimination_warning",
 			"priority": 90,
-			"duration": 2.6,
-			"once_only": true
+			"duration": 2.6
 		})
 
 	_last_position = position
