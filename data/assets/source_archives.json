@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "generated_from_supplied_archives": true,
+  "archives": [
+    {
+      "id": "wheels_in_pixels",
+      "filename": "Wheels_in_pixels.zip",
+      "sha256": "9b20eeabee650eb07bf6608456da49c19939135a9fe83b09a6bd8365b49de2eb",
+      "file_count": 225,
+      "png_count": 224,
+      "uncompressed_bytes": 1209501,
+      "role": "canonical_native_pixel_gameplay_backbone"
+    },
+    {
+      "id": "racing_asset_v2",
+      "filename": "Racing Asset Files Updated V2(1).zip",
+      "sha256": "0a0cad79df4559761e321e1a8f70a8f52e2ff4c76418721a1441a99d89270708",
+      "file_count": 57,
+      "png_count": 56,
+      "uncompressed_bytes": 237138,
+      "role": "native_pixel_supplement"
+    },
+    {
+      "id": "racing_asset_pro",
+      "filename": "Racing_AssetPack_Pro.zip",
+      "sha256": "60b7bfcf11a3dcda265c3362382868e99847e08c8e409f0c773d7158cca4c661",
+      "file_count": 3,
+      "png_count": 1,
+      "uncompressed_bytes": 72757,
+      "role": "authoring_source_extract_selectively"
+    },
+    {
+      "id": "craftpix_race_track",
+      "filename": "craftpix-099511-free-race-track-2d-game-tile-set(1).zip",
+      "sha256": "05a408fbf33fa74d13d87e3e8c5b38a81f16af6d65af54b95fddfa1671ba4238",
+      "file_count": 89,
+      "png_count": 74,
+      "uncompressed_bytes": 406749222,
+      "role": "supplemental_high_resolution_source"
+    },
+    {
+      "id": "craftpix_racing_game_kit",
+      "filename": "craftpix-889156-free-racing-game-kit(1).zip",
+      "sha256": "1d3c93dc6c1529650eae3eb4db4242b751720df4762d46f418c7ef7f2286d34b",
+      "file_count": 323,
+      "png_count": 286,
+      "uncompressed_bytes": 699796610,
+      "role": "canonical_craftpix_high_resolution_source"
+    }
+  ]
+}
