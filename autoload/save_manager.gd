@@ -135,6 +135,8 @@ func _parse_track_path(path: String):
 	return track
 
 func _replace_backup(final_path: String, backup_path: String) -> bool:
+	if _parse_track_path(final_path) == null:
+		return true
 	var absolute_backup := ProjectSettings.globalize_path(backup_path)
 	if FileAccess.file_exists(backup_path):
 		if DirAccess.remove_absolute(absolute_backup) != OK:
