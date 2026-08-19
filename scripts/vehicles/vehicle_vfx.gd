@@ -1,6 +1,7 @@
 extends Node2D
 class_name VehicleVFX
 
+const SettingsAccessScript = preload("res://scripts/utilities/settings_access.gd")
 const SMOKE_FRAME := Vector2i(32, 32)
 const SMOKE_COLUMNS := 6
 const SMOKE_FRAMES := 60
@@ -36,7 +37,7 @@ func update_state(delta: float, heading: float, drifting: bool, boosting: bool, 
 	nitro_sprite.rotation = heading
 	_smoke_time += delta * clampf(speed / 70.0, 1.0, 4.0)
 	_nitro_time += delta * 18.0
-	var intensity := clampf(float(SettingsManager.get_value("flash_intensity", 1.0)), 0.0, 1.0)
+	var intensity := clampf(float(SettingsAccessScript.get_value("flash_intensity", 1.0)), 0.0, 1.0)
 	var smoke_alpha := lerpf(0.35, 1.0, intensity)
 	var nitro_alpha := lerpf(0.18, 1.0, intensity)
 	smoke_left.modulate = Color(1.0, 1.0, 1.0, smoke_alpha)
