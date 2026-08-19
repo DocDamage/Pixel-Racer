@@ -36,9 +36,15 @@ func update_state(delta: float, heading: float, drifting: bool, boosting: bool, 
 	nitro_sprite.rotation = heading
 	_smoke_time += delta * clampf(speed / 70.0, 1.0, 4.0)
 	_nitro_time += delta * 18.0
-	smoke_left.visible = drifting
-	smoke_right.visible = drifting
-	nitro_sprite.visible = boosting
+	var intensity := clampf(float(SettingsManager.get_value("flash_intensity", 1.0)), 0.0, 1.0)
+	var smoke_alpha := lerpf(0.35, 1.0, intensity)
+	var nitro_alpha := lerpf(0.18, 1.0, intensity)
+	smoke_left.modulate = Color(1.0, 1.0, 1.0, smoke_alpha)
+	smoke_right.modulate = Color(1.0, 1.0, 1.0, smoke_alpha)
+	nitro_sprite.modulate = Color(1.0, 1.0, 1.0, nitro_alpha)
+	smoke_left.visible = drifting and intensity > 0.02
+	smoke_right.visible = drifting and intensity > 0.02
+	nitro_sprite.visible = boosting and intensity > 0.02
 	if drifting:
 		_set_frame(smoke_left, int(_smoke_time * 14.0) % SMOKE_FRAMES, SMOKE_COLUMNS, SMOKE_FRAME)
 		_set_frame(smoke_right, (int(_smoke_time * 14.0) + 5) % SMOKE_FRAMES, SMOKE_COLUMNS, SMOKE_FRAME)
