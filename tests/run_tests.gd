@@ -4,16 +4,21 @@ var failures := 0
 
 func _init() -> void:
 	_test_smart_road_masks()
+	_test_surface_painting()
 	_test_serialization_round_trip()
 	_test_validation()
 	_test_builder_clipboard()
 	_test_draw_track_tool()
 	_test_rating_and_preview()
+	_test_environment_catalog()
 	_test_garage_model()
+	_test_career_model()
 	_test_record_model()
 	_test_track_package()
+	_test_save_delete()
 	_test_race_mode_catalog()
 	_test_procedural_generator()
+	_test_accessibility_model()
 	if failures == 0:
 		print("Pixel Track Works tests: PASS")
 		quit(0)
@@ -29,6 +34,16 @@ func _test_smart_road_masks() -> void:
 	_expect(track.get_road_mask(Vector2i(3, 3)) == TrackData.EAST, "road A connects east")
 	_expect(track.get_road_mask(Vector2i(4, 3)) == (TrackData.WEST | TrackData.SOUTH), "corner resolves west+south")
 	_expect(track.get_road_mask(Vector2i(4, 4)) == TrackData.NORTH, "road C connects north")
+
+func _test_surface_painting() -> void:
+	var track := TrackData.new()
+	var cell := Vector2i(5, 5)
+	track.set_road(cell, "asphalt", "wide")
+	track.set_road_metadata(cell, {"route_id": "pit", "is_pit": true})
+	track.set_terrain(cell, "dirt")
+	_expect(track.get_surface_at(cell) == "dirt", "surface brush converts driveable road surface")
+	_expect(str(track.get_road(cell).get("width", "")) == "wide", "surface painting preserves width")
+	_expect(str(track.get_road(cell).get("route_id", "")) == "pit", "surface painting preserves route metadata")
 
 func _test_serialization_round_trip() -> void:
 	var source := ProceduralTrackGenerator.new().create_demo_track()
@@ -52,7 +67,7 @@ func _test_builder_clipboard() -> void:
 	track.set_road(Vector2i(2, 2))
 	track.set_road(Vector2i(3, 2))
 	track.set_terrain(Vector2i(2, 3), "sand")
-	track.add_object("barrier", Vector2i(3, 3), 1)
+	track.add_object("barrier_red", Vector2i(3, 3), 1)
 	var ops := TrackEditOps.new()
 	var clip := ops.capture(track, Vector2i(2, 2), Vector2i(3, 3))
 	_expect(Array(clip["roads"]).size() == 2, "clipboard captures road cells")
@@ -79,12 +94,24 @@ func _test_rating_and_preview() -> void:
 	var image := TrackPreviewGenerator.new().render(track, Vector2i(96, 54))
 	_expect(image.get_width() == 96 and image.get_height() == 54, "preview generator returns requested size")
 
+func _test_environment_catalog() -> void:
+	_expect(EnvironmentCatalog.ids().size() >= 6, "environment catalog exposes bundled barriers and tire")
+	_expect(str(EnvironmentCatalog.get_item("barrier_green").get("texture", "")).ends_with("barrier_green.png"), "environment catalog resolves bundled texture")
+	_expect(bool(EnvironmentCatalog.get_item("tire").get("dynamic", false)), "loose tire is configured as dynamic")
+
 func _test_garage_model() -> void:
 	var garage := GarageManager.new()
 	_expect(garage.vehicle_price("Hachiroku_Drifter") > 0, "garage derives vehicle prices")
 	var definition := garage.effective_definition("Hachiroku_Drifter")
 	_expect(definition.has("stats") and definition.has("tuning"), "garage produces effective tuned definition")
 	_expect(garage.tier_name("Hachiroku_Drifter", "engine") in GarageManager.TIER_NAMES, "garage exposes upgrade tier names")
+
+func _test_career_model() -> void:
+	var career := CareerManager.new()
+	_expect(CareerManager.TIERS.size() == 7, "career defines seven progression tiers")
+	_expect(str(career.tier_info(7).get("name", "")) == "Track Architect", "career ends at Track Architect")
+	_expect(career.contracts.size() >= 10, "career includes broad builder contracts")
+	_expect(career.championships.size() == 7, "career has one championship definition per tier")
 
 func _test_record_model() -> void:
 	var records := RecordManager.new()
@@ -96,24 +123,51 @@ func _test_record_model() -> void:
 
 func _test_track_package() -> void:
 	var track := ProceduralTrackGenerator.new().create_demo_track()
-	track.track_id = "ci-package-track"
+	track.track_id = "ci-package-track-%s" % Time.get_ticks_msec()
 	var root := "user://ci_packages"
-	var package_dir := TrackPackageManager.new().export_package(track, root)
+	var manager := TrackPackageManager.new()
+	var package_dir := manager.export_package(track, root)
 	_expect(not package_dir.is_empty(), "track package exports")
-	var result := TrackPackageManager.new().validate_package(package_dir)
+	var result := manager.validate_package(package_dir)
 	_expect(bool(result.get("valid", false)), "exported track package validates")
+	var imported = manager.import_package(package_dir)
+	_expect(imported != null, "track package imports")
+	if imported != null:
+		SaveManager.delete_track(imported.track_id)
+
+func _test_save_delete() -> void:
+	var track := ProceduralTrackGenerator.new().create_demo_track()
+	track.track_id = "ci-delete-%s" % Time.get_ticks_msec()
+	_expect(SaveManager.save_track(track), "save manager writes track")
+	_expect(SaveManager.load_track(track.track_id) != null, "saved track loads")
+	_expect(SaveManager.delete_track(track.track_id), "save manager deletes track folder")
+	_expect(SaveManager.load_track(track.track_id) == null, "deleted track no longer loads")
 
 func _test_race_mode_catalog() -> void:
-	for mode in ["circuit", "time_trial", "sprint", "checkpoint", "drift"]:
+	for mode in ["circuit", "time_trial", "sprint", "checkpoint", "drift", "elimination"]:
 		_expect(RaceModeCatalog.MODES.has(mode), "race mode %s is registered" % mode)
 	_expect(int(RaceModeCatalog.get_mode("circuit").get("laps", 0)) == 3, "circuit preset carries lap count")
 	_expect(float(RaceModeCatalog.get_mode("checkpoint").get("checkpoint_bonus", 0.0)) > 0.0, "checkpoint mode adds time")
+	_expect(int(RaceModeCatalog.get_mode("elimination").get("ai_count", 0)) >= 5, "elimination preset supplies a race field")
 
 func _test_procedural_generator() -> void:
 	for seed_value in [1, 2, 3, 99, 2026]:
 		var track := ProceduralTrackGenerator.new().generate(seed_value, 40)
 		var result := TrackValidator.new().validate(track)
 		_expect(bool(result["raceable"]), "generated seed %d is raceable" % seed_value)
+		_expect(int(TrackRating.new().calculate(track).get("corners", 0)) >= 6, "generated seed %d has detailed geometry" % seed_value)
+	var rally := ProceduralTrackGenerator.new().generate(77, 44, "rally")
+	var rally_result := TrackValidator.new().validate(rally)
+	var rally_rating := TrackRating.new().calculate(rally)
+	_expect(bool(rally_result["raceable"]), "generated rally track is raceable")
+	_expect(int(rally_rating.get("offroad_percent", 0)) >= 30, "rally generator applies loose road surfaces")
+
+func _test_accessibility_model() -> void:
+	_expect(SettingsManager.defaults.has("ui_scale"), "settings include UI scale")
+	_expect(SettingsManager.defaults.has("controller_vibration"), "settings include vibration control")
+	_expect(SettingsManager.defaults.has("flash_intensity"), "settings include flash reduction")
+	_expect(InputManager.ACTIONS.has("accelerate"), "input manager exposes remappable driving actions")
+	_expect(InputManager.ACTIONS.has("builder_place"), "input manager exposes remappable builder actions")
 
 func _expect(condition: bool, label: String) -> void:
 	if condition:
