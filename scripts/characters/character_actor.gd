@@ -32,7 +32,12 @@ func setup(character_definition: CharacterDefinition) -> void:
 func walk_to(destination: Vector2) -> void:
 	_target = destination
 	_has_target = true
-	_moving = true
+	if not _moving:
+		_moving = true
+		_frame_index = 0
+		_animation_time = 0.0
+		_load_animation_textures(true)
+		_apply_frame()
 	movement_started.emit(destination)
 
 func stop() -> void:
