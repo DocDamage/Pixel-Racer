@@ -1,0 +1,325 @@
+{
+  "Bologna_Superbike": {
+    "type": "bike",
+    "colors": [
+      "black",
+      "blue",
+      "green",
+      "pink",
+      "purple",
+      "white",
+      "default"
+    ]
+  },
+  "Hachiroku_Drifter": {
+    "type": "car",
+    "colors": [
+      "black",
+      "blue",
+      "green",
+      "pink",
+      "purple",
+      "red",
+      "yellow",
+      "default"
+    ]
+  },
+  "Modern_Monster_Pickup": {
+    "type": "car",
+    "colors": [
+      "black",
+      "green",
+      "pink",
+      "purple",
+      "red",
+      "white",
+      "yellow",
+      "default"
+    ]
+  },
+  "Retro_Wedge_70s": {
+    "type": "car",
+    "colors": [
+      "black",
+      "blue",
+      "green",
+      "pink",
+      "purple",
+      "white",
+      "yellow",
+      "default"
+    ]
+  },
+  "Military_Luxury_4x4": {
+    "type": "car",
+    "colors": [
+      "black",
+      "blue",
+      "green",
+      "pink",
+      "purple",
+      "red",
+      "yellow",
+      "default"
+    ]
+  },
+  "Formula_Grand_Prix": {
+    "type": "car",
+    "colors": [
+      "black",
+      "blue",
+      "green",
+      "pink",
+      "purple",
+      "white",
+      "yellow",
+      "default"
+    ]
+  },
+  "Iron_Chopper": {
+    "type": "bike",
+    "colors": [
+      "black",
+      "green",
+      "pink",
+      "purple",
+      "red",
+      "white",
+      "default"
+    ]
+  },
+  "Classic_Italian_Scooter": {
+    "type": "bike",
+    "colors": [
+      "black",
+      "blue",
+      "green",
+      "pink",
+      "purple",
+      "white",
+      "default"
+    ]
+  },
+  "Midnight_Godzilla": {
+    "type": "car",
+    "colors": [
+      "black",
+      "green",
+      "pink",
+      "purple",
+      "red",
+      "white",
+      "yellow",
+      "default"
+    ]
+  },
+  "Tiny_British_Hot_Hatch": {
+    "type": "car",
+    "colors": [
+      "black",
+      "blue",
+      "green",
+      "pink",
+      "purple",
+      "white",
+      "yellow",
+      "default"
+    ]
+  },
+  "Compact_Rally_Hatch": {
+    "type": "car",
+    "colors": [
+      "blue",
+      "green",
+      "pink",
+      "purple",
+      "yellow",
+      "default"
+    ]
+  },
+  "Open_Wheel_Roadster": {
+    "type": "car",
+    "colors": [
+      "black",
+      "green",
+      "pink",
+      "purple",
+      "red",
+      "white",
+      "yellow",
+      "default"
+    ]
+  },
+  "Vintage_Fins_Limousine": {
+    "type": "car",
+    "colors": [
+      "black",
+      "blue",
+      "green",
+      "pink",
+      "purple",
+      "white",
+      "yellow",
+      "default"
+    ]
+  },
+  "Hyper_Electric_Future": {
+    "type": "car",
+    "colors": "default"
+  },
+  "Classic_Bug": {
+    "type": "car",
+    "colors": [
+      "black",
+      "blue",
+      "pink",
+      "purple",
+      "red",
+      "white",
+      "yellow",
+      "default"
+    ]
+  },
+  "Heavy_Tactical_SUV": {
+    "type": "car",
+    "colors": [
+      "black",
+      "blue",
+      "green",
+      "pink",
+      "purple",
+      "red",
+      "yellow",
+      "default"
+    ]
+  },
+  "High_Wing_Muscle": {
+    "type": "car",
+    "colors": [
+      "black",
+      "green",
+      "pink",
+      "purple",
+      "red",
+      "white",
+      "yellow",
+      "default"
+    ]
+  },
+  "Italian_Supercar_87": {
+    "type": "car",
+    "colors": [
+      "black",
+      "blue",
+      "green",
+      "pink",
+      "purple",
+      "white",
+      "yellow",
+      "default"
+    ]
+  },
+  "TukTuk_Utility_3W": {
+    "type": "car",
+    "colors": [
+      "black",
+      "blue",
+      "green",
+      "pink",
+      "purple",
+      "white",
+      "yellow",
+      "default"
+    ]
+  },
+  "Group_B_Legend": {
+    "type": "car",
+    "colors": [
+      "black",
+      "blue",
+      "green",
+      "pink",
+      "purple",
+      "white",
+      "yellow",
+      "default"
+    ]
+  },
+  "Dirt_Mud_Bike": {
+    "type": "bike",
+    "colors": [
+      "black",
+      "blue",
+      "green",
+      "pink",
+      "purple",
+      "white",
+      "default"
+    ]
+  },
+  "Polygon_Truck": {
+    "type": "car",
+    "colors": [
+      "black",
+      "blue",
+      "green",
+      "pink",
+      "purple",
+      "red",
+      "yellow",
+      "default"
+    ]
+  },
+  "Stuttgart_91": {
+    "type": "car",
+    "colors": [
+      "black",
+      "green",
+      "pink",
+      "purple",
+      "red",
+      "white",
+      "yellow",
+      "default"
+    ]
+  },
+  "Classic_Mako_Vette": {
+    "type": "car",
+    "colors": [
+      "black",
+      "green",
+      "pink",
+      "purple",
+      "red",
+      "white",
+      "yellow",
+      "default"
+    ]
+  },
+  "Grand_Royalty_Limo": {
+    "type": "car",
+    "colors": [
+      "black",
+      "blue",
+      "pink",
+      "purple",
+      "red",
+      "white",
+      "yellow",
+      "default"
+    ]
+  },
+  "Pony_Fastback_70s": {
+    "type": "car",
+    "colors": [
+      "black",
+      "blue",
+      "green",
+      "pink",
+      "purple",
+      "white",
+      "yellow",
+      "default"
+    ]
+  }
+}
