@@ -62,6 +62,11 @@ jobs:
           /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path . --script res://tests/run_race_progress_tests.gd
 
+      - name: Run presentation and collision tests
+        run: |
+          /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path . --script res://tests/run_presentation_tests.gd
+
       - name: Run deterministic stress tests
         run: |
           /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
