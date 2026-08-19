@@ -26,6 +26,7 @@ var sprite: Sprite2D
 var collision_shape: CollisionShape2D
 var vfx: VehicleVFX
 var skid_marks: SkidMarkManager
+var collision_fx: CollisionFX
 var audio: VehicleAudio
 var is_drifting := false
 var is_boosting := false
@@ -50,6 +51,7 @@ func _ready() -> void:
 	vfx.name = "VehicleVFX"
 	add_child(vfx)
 	_ensure_skid_manager()
+	_ensure_collision_fx()
 
 func setup(source_track: TrackData, id: String, player_controlled: bool = true, color: String = "default") -> void:
 	track = source_track
@@ -162,8 +164,12 @@ func _physics_process(delta: float) -> void:
 	var pre_collision_speed := velocity.length()
 	move_and_slide()
 	if get_slide_collision_count() > 0:
+		var impact_strength: float = clampf(pre_collision_speed / 420.0, 0.15, 1.0)
+		var slide_collision: KinematicCollision2D = get_slide_collision(0)
+		if collision_fx != null and slide_collision != null:
+			collision_fx.emit_impact(global_position, slide_collision.get_normal(), impact_strength)
 		if audio != null:
-			audio.trigger_impact(clampf(pre_collision_speed / 420.0, 0.15, 1.0))
+			audio.trigger_impact(impact_strength)
 		velocity *= 0.68
 		if _collision_rumble_cooldown <= 0.0:
 			_rumble(0.52, 0.22)
@@ -258,6 +264,17 @@ func _ensure_skid_manager() -> void:
 	skid_marks = SkidMarkManager.new()
 	skid_marks.name = "SkidMarkManager"
 	get_tree().current_scene.add_child(skid_marks)
+
+func _ensure_collision_fx() -> void:
+	var existing: Node = get_tree().get_first_node_in_group("collision_fx")
+	if existing is CollisionFX:
+		collision_fx = existing as CollisionFX
+		return
+	if get_tree().current_scene == null:
+		return
+	collision_fx = CollisionFX.new()
+	collision_fx.name = "CollisionFX"
+	get_tree().current_scene.add_child(collision_fx)
 
 func _exit_tree() -> void:
 	if audio != null:
