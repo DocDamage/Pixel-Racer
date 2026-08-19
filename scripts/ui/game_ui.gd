@@ -237,7 +237,7 @@ func open_garage() -> void:
 	var catalog := VehicleCatalog.new()
 	for id in catalog.ids():
 		var definition := catalog.get_vehicle(id)
-		var owned := game.garage.is_owned(id)
+		var owned: bool = bool(game.garage.is_owned(id))
 		var label := str(definition.get("name", id))
 		if not owned:
 			label += "  •  %d cr" % game.garage.vehicle_price(id)
@@ -259,7 +259,7 @@ func open_career() -> void:
 	list.custom_minimum_size = Vector2(450, 0)
 	scroll.add_child(list)
 	for contract in game.career.contracts:
-		var evaluation := game.career.evaluate_contract(contract, game.track)
+		var evaluation: Dictionary = game.career.evaluate_contract(contract, game.track)
 		var line := HBoxContainer.new()
 		var label := Label.new()
 		label.custom_minimum_size = Vector2(330, 48)
@@ -423,7 +423,7 @@ func _build_builder_hud() -> void:
 	tool_box.add_child(tool_label)
 	var names := {"road":"1 ROAD", "draw_road":"2 DRAW", "pit":"3 PIT", "alternate":"B ALT", "sand":"4 SAND", "dirt":"5 DIRT", "grass":"6 GRASS", "start_finish":"7 START", "checkpoint":"8 CHECK", "barrier":"9 BARRIER", "erase":"0 ERASE"}
 	for tool in BuilderController.TOOLS:
-		var tool_id := tool
+		var tool_id: String = str(tool)
 		tool_box.add_child(_make_button(str(names.get(tool, tool.to_upper())), func(): game.builder.set_tool(tool_id), PANEL_2, Vector2(96, 20)))
 	var actions := HBoxContainer.new()
 	actions.position = Vector2(116, 302)
@@ -555,7 +555,7 @@ func _track_card(entry: Dictionary) -> Control:
 func _open_vehicle_detail(vehicle_id: String) -> void:
 	_clear_modal()
 	var definition := VehicleCatalog.new().get_vehicle(vehicle_id)
-	var owned := game.garage.is_owned(vehicle_id)
+	var owned: bool = bool(game.garage.is_owned(vehicle_id))
 	var panel := _modal_panel(str(definition.get("name", vehicle_id)), Vector2(65, 20), Vector2(510, 320))
 	var box := panel.get_node("Content") as VBoxContainer
 	var stats: Dictionary = game.garage.effective_definition(vehicle_id).get("stats", definition.get("stats", {}))
@@ -564,7 +564,7 @@ func _open_vehicle_detail(vehicle_id: String) -> void:
 	stat_label.add_theme_color_override("font_color", ACCENT)
 	box.add_child(stat_label)
 	if not owned:
-		var price := game.garage.vehicle_price(vehicle_id)
+		var price: int = int(game.garage.vehicle_price(vehicle_id))
 		box.add_child(_make_button("BUY • %d CREDITS" % price, func():
 			var result: Dictionary = game.buy_vehicle(vehicle_id)
 			if bool(result.get("success", false)):
@@ -588,8 +588,8 @@ func _open_vehicle_detail(vehicle_id: String) -> void:
 		scroll.add_child(upgrade_box)
 		for group in GarageManager.UPGRADE_GROUPS:
 			var group_id := str(group)
-			var level := game.garage.upgrade_level(vehicle_id, group_id)
-			var cost := game.garage.upgrade_cost(vehicle_id, group_id)
+			var level: int = int(game.garage.upgrade_level(vehicle_id, group_id))
+			var cost: int = int(game.garage.upgrade_cost(vehicle_id, group_id))
 			var text := "%s • %s" % [group_id.to_upper(), game.garage.tier_name(vehicle_id, group_id)]
 			if level < 3:
 				text += " • %d cr" % cost
