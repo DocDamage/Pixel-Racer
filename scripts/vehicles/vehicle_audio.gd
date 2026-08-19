@@ -48,6 +48,11 @@ func configure(vehicle_definition: Dictionary) -> void:
 func start() -> void:
 	if enabled:
 		return
+	var parent_vehicle: Node = get_parent()
+	if parent_vehicle != null:
+		var raw_definition: Variant = parent_vehicle.get("definition")
+		if raw_definition is Dictionary:
+			configure(raw_definition as Dictionary)
 	enabled = true
 	var generator := AudioStreamGenerator.new()
 	generator.mix_rate = MIX_RATE
