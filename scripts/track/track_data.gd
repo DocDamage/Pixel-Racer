@@ -1,7 +1,7 @@
 extends RefCounted
 class_name TrackData
 
-const SCHEMA_VERSION := 1
+const SCHEMA_VERSION := 2
 const NORTH := 1
 const EAST := 2
 const SOUTH := 4
@@ -11,12 +11,12 @@ const DRIVEABLE_SURFACES := ["asphalt", "dirt", "sand", "gravel"]
 const ROAD_WIDTHS := ["narrow", "standard", "wide", "extra_wide"]
 
 var schema_version: int = SCHEMA_VERSION
-var track_id: String = ""
-var name: String = "Untitled Track"
-var author: String = "Player"
-var width: int = 64
-var height: int = 64
-var cell_size: int = 64
+var track_id := ""
+var name := "Untitled Track"
+var author := "Player"
+var width := 64
+var height := 64
+var cell_size := 64
 var terrain: Dictionary = {}
 var road_tiles: Dictionary = {}
 var objects: Array[Dictionary] = []
@@ -27,11 +27,9 @@ var metadata: Dictionary = {
 	"difficulty": 1,
 	"created_at": "",
 	"updated_at": "",
-	"routes": {
-		"main": {"id": "main", "type": "main", "parent": "", "preferred": true, "legal": true}
-	}
+	"routes": {"main": {"id": "main", "type": "main", "parent": "", "preferred": true, "legal": true}}
 }
-var dirty: bool = false
+var dirty := false
 
 func _init() -> void:
 	if track_id.is_empty():
@@ -51,9 +49,7 @@ func get_road_mask(cell: Vector2i) -> int:
 	return int(get_road(cell).get("connection_mask", 0))
 
 func get_route_id(cell: Vector2i) -> String:
-	if not has_road(cell):
-		return ""
-	return str(get_road(cell).get("route_id", "main"))
+	return str(get_road(cell).get("route_id", "main")) if has_road(cell) else ""
 
 func get_route_cells(route_id: String) -> Array[Vector2i]:
 	var output: Array[Vector2i] = []
@@ -63,8 +59,7 @@ func get_route_cells(route_id: String) -> Array[Vector2i]:
 	return output
 
 func route_ids() -> Array[String]:
-	var seen: Dictionary = {}
-	seen["main"] = true
+	var seen: Dictionary = {"main": true}
 	for cell in road_cells():
 		seen[get_route_id(cell)] = true
 	var routes_value = metadata.get("routes", {})
@@ -94,17 +89,11 @@ func ensure_route_definition(route_id: String, values: Dictionary = {}) -> Dicti
 		return {}
 	_ensure_default_routes()
 	var routes: Dictionary = metadata["routes"]
-	var definition: Dictionary = {}
+	var definition: Dictionary
 	if routes.has(route_id) and routes[route_id] is Dictionary:
 		definition = Dictionary(routes[route_id]).duplicate(true)
 	else:
-		definition = {
-			"id": route_id,
-			"type": "main" if route_id == "main" else "alternate",
-			"parent": "" if route_id == "main" else "main",
-			"preferred": route_id == "main",
-			"legal": true
-		}
+		definition = {"id": route_id, "type": "main" if route_id == "main" else "alternate", "parent": "" if route_id == "main" else "main", "preferred": route_id == "main", "legal": true}
 	for key in values:
 		definition[key] = values[key]
 	definition["id"] = route_id
@@ -285,10 +274,11 @@ func to_dict() -> Dictionary:
 	var road_array: Array = []
 	for key in road_tiles:
 		road_array.append(road_tiles[key].duplicate(true))
-	return {"schema_version": schema_version, "track_id": track_id, "name": name, "author": author, "width": width, "height": height, "cell_size": cell_size, "terrain": terrain_array, "road_tiles": road_array, "objects": objects.duplicate(true), "race_objects": race_objects.duplicate(true), "event_presets": event_presets.duplicate(true), "metadata": metadata.duplicate(true)}
+	return {"schema_version": SCHEMA_VERSION, "track_id": track_id, "name": name, "author": author, "width": width, "height": height, "cell_size": cell_size, "terrain": terrain_array, "road_tiles": road_array, "objects": objects.duplicate(true), "race_objects": race_objects.duplicate(true), "event_presets": event_presets.duplicate(true), "metadata": metadata.duplicate(true)}
 
-func from_dict(data: Dictionary) -> void:
-	schema_version = int(data.get("schema_version", SCHEMA_VERSION))
+func from_dict(source: Dictionary) -> void:
+	var data := _migrate_data(source)
+	schema_version = SCHEMA_VERSION
 	track_id = str(data.get("track_id", _new_id()))
 	name = str(data.get("name", "Untitled Track"))
 	author = str(data.get("author", "Player"))
@@ -304,12 +294,7 @@ func from_dict(data: Dictionary) -> void:
 	for raw in data.get("road_tiles", []):
 		if raw is Dictionary:
 			var cell := Vector2i(int(raw.get("x", 0)), int(raw.get("y", 0)))
-			var road: Dictionary = raw.duplicate(true)
-			if not road.has("width"):
-				road["width"] = "standard"
-			if not road.has("route_id"):
-				road["route_id"] = "main"
-			road_tiles[_key(cell)] = road
+			road_tiles[_key(cell)] = raw.duplicate(true)
 	objects = _typed_dictionary_array(data.get("objects", []))
 	race_objects = _typed_dictionary_array(data.get("race_objects", []))
 	event_presets = _typed_dictionary_array(data.get("event_presets", []))
@@ -327,11 +312,49 @@ func clone():
 	copy.dirty = dirty
 	return copy
 
+func _migrate_data(source: Dictionary) -> Dictionary:
+	var data := source.duplicate(true)
+	var version := int(data.get("schema_version", 1))
+	if version < 1:
+		version = 1
+	if version == 1:
+		data = _migrate_v1_to_v2(data)
+		version = 2
+	if version > SCHEMA_VERSION:
+		var raw_metadata = data.get("metadata", {})
+		var future_metadata: Dictionary = raw_metadata.duplicate(true) if raw_metadata is Dictionary else {}
+		future_metadata["source_schema_version"] = version
+		data["metadata"] = future_metadata
+	data["schema_version"] = SCHEMA_VERSION
+	return data
+
+func _migrate_v1_to_v2(source: Dictionary) -> Dictionary:
+	var data := source.duplicate(true)
+	var migrated_roads: Array = []
+	for raw in data.get("road_tiles", []):
+		if raw is Dictionary:
+			var road: Dictionary = raw.duplicate(true)
+			if not road.has("width") or str(road.get("width", "")) not in ROAD_WIDTHS:
+				road["width"] = "standard"
+			if not road.has("route_id") or str(road.get("route_id", "")).is_empty():
+				road["route_id"] = "main"
+			migrated_roads.append(road)
+	data["road_tiles"] = migrated_roads
+	var raw_metadata = data.get("metadata", {})
+	var migrated_metadata: Dictionary = raw_metadata.duplicate(true) if raw_metadata is Dictionary else {}
+	var routes_value = migrated_metadata.get("routes", {})
+	var routes: Dictionary = routes_value.duplicate(true) if routes_value is Dictionary else {}
+	if not routes.has("main") or not routes["main"] is Dictionary:
+		routes["main"] = {"id": "main", "type": "main", "parent": "", "preferred": true, "legal": true}
+	migrated_metadata["routes"] = routes
+	migrated_metadata["migrated_from_schema"] = 1
+	data["metadata"] = migrated_metadata
+	data["schema_version"] = 2
+	return data
+
 func _ensure_default_routes() -> void:
 	var routes_value = metadata.get("routes", {})
-	var routes: Dictionary = {}
-	if routes_value is Dictionary:
-		routes = Dictionary(routes_value)
+	var routes: Dictionary = routes_value.duplicate(true) if routes_value is Dictionary else {}
 	if not routes.has("main") or not routes["main"] is Dictionary:
 		routes["main"] = {"id": "main", "type": "main", "parent": "", "preferred": true, "legal": true}
 	metadata["routes"] = routes
