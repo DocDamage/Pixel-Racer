@@ -48,7 +48,8 @@ func _build_overlays() -> void:
 
 func _on_dialogue_started(entry: DialogueEntry) -> void:
 	var speaker_name: String = str(speaker_names.get(entry.speaker_id, ""))
-	var use_radio: bool = race_mode and not entry.blocking
+	var force_full: bool = bool(entry.metadata.get("force_full", false))
+	var use_radio: bool = race_mode and not entry.blocking and not force_full
 	if use_radio:
 		dialogue_overlay.hide_entry()
 		radio_overlay.show_entry(entry, atlas, speaker_name)
@@ -59,7 +60,8 @@ func _on_dialogue_started(entry: DialogueEntry) -> void:
 func _on_dialogue_finished(entry: DialogueEntry) -> void:
 	if entry == null:
 		return
-	if race_mode and not entry.blocking:
+	var force_full: bool = bool(entry.metadata.get("force_full", false))
+	if race_mode and not entry.blocking and not force_full:
 		radio_overlay.hide_entry()
 	else:
 		dialogue_overlay.hide_entry()
