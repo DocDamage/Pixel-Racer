@@ -5,6 +5,9 @@ var dialogue_manager: DialogueManager
 var portrait_atlas: PortraitAtlas
 var dialogue_presenter: DialoguePresenter
 var race_radio: RaceRadioController
+var dialogue_catalog := DialogueCatalog.new()
+var character_catalog := CharacterCatalog.new()
+var dialogue_state_store := DialogueStateStore.new()
 
 var _game_root: Node = null
 var _race_controller: RaceController = null
@@ -16,17 +19,22 @@ func _ready() -> void:
 	dialogue_manager = DialogueManager.new()
 	dialogue_manager.name = "DialogueManager"
 	add_child(dialogue_manager)
+	dialogue_manager.load_state(dialogue_state_store.load_state())
+	if not dialogue_manager.dialogue_finished.is_connected(_persist_dialogue_state):
+		dialogue_manager.dialogue_finished.connect(_persist_dialogue_state)
+	character_catalog.load_manifest()
 	portrait_atlas = PortraitAtlas.new()
+	if not character_catalog.portrait_manifest.is_empty():
+		portrait_atlas.load_manifest(character_catalog.portrait_manifest)
 	dialogue_presenter = DialoguePresenter.new()
 	dialogue_presenter.name = "DialoguePresenter"
 	add_child(dialogue_presenter)
 	dialogue_presenter.setup(dialogue_manager, portrait_atlas)
-	dialogue_presenter.set_speaker_name("crew_chief", "Crew Chief")
-	dialogue_presenter.set_speaker_name("spotter", "Spotter")
-	dialogue_presenter.set_speaker_name("rival", "Rival")
-	dialogue_presenter.set_speaker_name("mechanic", "Mechanic")
-	dialogue_presenter.set_speaker_name("builder", "Track Builder")
-	dialogue_presenter.set_speaker_name("event_host", "Event Control")
+	if dialogue_catalog.load_characters():
+		for speaker_id in dialogue_catalog.character_ids():
+			dialogue_presenter.set_speaker_name(speaker_id, dialogue_catalog.display_name(speaker_id))
+	else:
+		_register_fallback_speaker_names()
 	race_radio = RaceRadioController.new()
 	race_radio.name = "RaceRadioController"
 	add_child(race_radio)
@@ -48,6 +56,12 @@ func _process(_delta: float) -> void:
 			race_radio.update_state(state)
 	elif current_mode == GameState.MODE_BUILDER:
 		_check_builder_validation()
+
+func character_assets_ready() -> bool:
+	return character_catalog.is_runtime_ready()
+
+func character_asset_issues() -> Array[String]:
+	return character_catalog.validation_issues()
 
 func _bind_game_root() -> void:
 	var parent_node: Node = get_parent()
@@ -220,6 +234,19 @@ func _check_builder_validation() -> void:
 		"blocking": false,
 		"cooldown": 12.0
 	})
+
+func _persist_dialogue_state(entry: DialogueEntry) -> void:
+	if entry == null or not entry.once_only:
+		return
+	dialogue_state_store.save_state(dialogue_manager.serialize_state())
+
+func _register_fallback_speaker_names() -> void:
+	dialogue_presenter.set_speaker_name("crew_chief", "Crew Chief")
+	dialogue_presenter.set_speaker_name("spotter", "Spotter")
+	dialogue_presenter.set_speaker_name("rival", "Rival")
+	dialogue_presenter.set_speaker_name("mechanic", "Mechanic")
+	dialogue_presenter.set_speaker_name("builder", "Track Builder")
+	dialogue_presenter.set_speaker_name("event_host", "Event Control")
 
 func _race_state() -> Dictionary:
 	if _game_root == null or not _game_root.has_method("race_state"):
