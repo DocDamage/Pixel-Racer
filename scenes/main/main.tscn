@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource path="res://scripts/main/game_root.gd" type="Script" id="1_root"]
 [ext_resource path="res://scripts/ui/race_standings_ui.gd" type="Script" id="2_standings"]
@@ -10,6 +10,7 @@
 [ext_resource path="res://scripts/audio/game_sfx.gd" type="Script" id="8_game_sfx"]
 [ext_resource path="res://scripts/audio/ambience_controller.gd" type="Script" id="9_ambience"]
 [ext_resource path="res://scripts/ui/procedural_track_ui.gd" type="Script" id="10_procedural_ui"]
+[ext_resource path="res://scripts/ui/track_sharing_ui.gd" type="Script" id="11_sharing_ui"]
 
 [node name="PixelTrackWorks" type="Node2D"]
 script = ExtResource("1_root")
@@ -40,3 +41,6 @@ script = ExtResource("9_ambience")
 
 [node name="ProceduralTrackUI" type="CanvasLayer" parent="."]
 script = ExtResource("10_procedural_ui")
+
+[node name="TrackSharingUI" type="CanvasLayer" parent="."]
+script = ExtResource("11_sharing_ui")
