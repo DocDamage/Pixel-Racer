@@ -5,21 +5,21 @@ var track: TrackData = null
 var adjacency: Dictionary = {}
 var active_route_id := ""
 
-func build(source_track, route_id: String = "") -> void:
+func build(source_track: TrackData, route_id: String = "") -> void:
 	track = source_track
 	active_route_id = route_id
 	adjacency.clear()
 	if track == null:
 		return
 	var allowed: Dictionary = {}
-	for cell in track.road_cells():
+	for cell: Vector2i in track.road_cells():
 		if route_id.is_empty() or track.get_route_id(cell) == route_id:
 			allowed[_key(cell)] = cell
 	for key in allowed:
 		var cell: Vector2i = allowed[key]
 		var neighbors: Array[Vector2i] = []
-		for direction in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
-			var candidate := cell + direction
+		for direction: Vector2i in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
+			var candidate: Vector2i = cell + direction
 			if allowed.has(_key(candidate)):
 				neighbors.append(candidate)
 		adjacency[key] = neighbors
@@ -41,15 +41,15 @@ func connected_count(start: Vector2i) -> int:
 		if visited.has(key):
 			continue
 		visited[key] = true
-		for next_cell in adjacency.get(key, []):
+		for next_cell: Vector2i in adjacency.get(key, []):
 			if not visited.has(_key(next_cell)):
 				queue.append(next_cell)
 	return visited.size()
 
-func is_connected() -> bool:
+func all_connected() -> bool:
 	if adjacency.is_empty():
 		return false
-	var first := _cell_from_key(str(adjacency.keys()[0]))
+	var first: Vector2i = _cell_from_key(str(adjacency.keys()[0]))
 	return connected_count(first) == adjacency.size()
 
 func is_single_loop(start: Vector2i) -> bool:
@@ -63,7 +63,7 @@ func is_single_loop(start: Vector2i) -> bool:
 	return true
 
 func is_simple_path() -> bool:
-	if adjacency.size() < 2 or not is_connected():
+	if adjacency.size() < 2 or not all_connected():
 		return false
 	var endpoints := 0
 	for key in adjacency:
@@ -117,7 +117,7 @@ func find_path_order(start: Vector2i = Vector2i(-999999, -999999)) -> Array[Vect
 		ordered.append(current)
 		var candidates: Array = adjacency.get(_key(current), [])
 		var next_cell := Vector2i(-999999, -999999)
-		for candidate in candidates:
+		for candidate: Vector2i in candidates:
 			if candidate != previous:
 				next_cell = candidate
 				break
@@ -138,9 +138,9 @@ func route_interfaces(route_id: String, parent_route_id: String = "main") -> Arr
 	if track == null:
 		return output
 	var seen: Dictionary = {}
-	for cell in track.get_route_cells(route_id):
-		for direction in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
-			var neighbor := cell + direction
+	for cell: Vector2i in track.get_route_cells(route_id):
+		for direction: Vector2i in [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]:
+			var neighbor: Vector2i = cell + direction
 			if not track.has_road(neighbor) or track.get_route_id(neighbor) != parent_route_id:
 				continue
 			var pair_key := "%s>%s" % [_key(cell), _key(neighbor)]
