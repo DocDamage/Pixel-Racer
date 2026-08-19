@@ -9,6 +9,7 @@ const COLOR_SAND := Color("#d4a359")
 const COLOR_GRAVEL := Color("#766d66")
 const COLOR_CURB_RED := Color("#e94b45")
 const COLOR_CURB_WHITE := Color("#f4eadf")
+const WIDTH_SCALE := {"narrow": 0.52, "standard": 0.68, "wide": 0.80, "extra_wide": 0.92}
 
 var track = null
 var cursor_cell := Vector2i.ZERO
@@ -68,22 +69,17 @@ func _draw_terrain(size: float) -> void:
 		var item: Dictionary = track.terrain[key]
 		var cell := Vector2i(int(item.get("x", 0)), int(item.get("y", 0)))
 		var type := str(item.get("type", "grass"))
-		var color := COLOR_GRASS
-		match type:
-			"sand": color = COLOR_SAND
-			"dirt": color = COLOR_DIRT
-			"gravel": color = COLOR_GRAVEL
-			_: color = COLOR_GRASS
-		draw_rect(Rect2(Vector2(cell) * size, Vector2.ONE * size), color, true)
+		draw_rect(Rect2(Vector2(cell) * size, Vector2.ONE * size), _surface_color(type), true)
 
 func _draw_roads(size: float) -> void:
-	var road_width := size * 0.68
-	var half := road_width * 0.5
 	for cell in track.road_cells():
+		var road: Dictionary = track.get_road(cell)
 		var center := track.cell_to_world(cell)
 		var mask: int = track.get_road_mask(cell)
 		var surface := track.get_surface_at(cell)
 		var road_color := _surface_color(surface)
+		var road_width := size * float(WIDTH_SCALE.get(str(road.get("width", "standard")), WIDTH_SCALE["standard"]))
+		var half := road_width * 0.5
 		draw_rect(Rect2(center - Vector2(half, half), Vector2(road_width, road_width)), road_color, true)
 		if (mask & TrackData.NORTH) != 0:
 			draw_rect(Rect2(Vector2(center.x - half, cell.y * size), Vector2(road_width, size * 0.5)), road_color, true)
@@ -94,6 +90,8 @@ func _draw_roads(size: float) -> void:
 		if (mask & TrackData.EAST) != 0:
 			draw_rect(Rect2(Vector2(center.x, center.y - half), Vector2(size * 0.5, road_width)), road_color, true)
 		_draw_curb_hints(center, mask, size, half)
+		if bool(road.get("is_pit", false)):
+			draw_circle(center, 4.0, Color(0.15, 0.85, 1.0, 0.8))
 
 func _draw_curb_hints(center: Vector2, mask: int, size: float, half: float) -> void:
 	var stripe := 3.0
@@ -146,4 +144,5 @@ func _surface_color(surface: String) -> Color:
 		"dirt": return COLOR_DIRT
 		"sand": return COLOR_SAND
 		"gravel": return COLOR_GRAVEL
+		"grass": return COLOR_GRASS
 		_: return COLOR_ASPHALT

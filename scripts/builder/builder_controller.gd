@@ -7,17 +7,21 @@ signal test_requested
 signal save_requested
 signal load_requested
 signal tool_changed(tool_name: String)
+signal width_changed(width_name: String)
 signal selection_changed(rect: Rect2i, active: bool)
 signal clipboard_changed(has_content: bool)
 
-const TOOLS := ["road", "sand", "dirt", "grass", "start_finish", "checkpoint", "barrier", "erase"]
+const TOOLS := ["road", "draw_road", "pit", "sand", "dirt", "grass", "start_finish", "checkpoint", "barrier", "erase"]
 
 var track = null
 var renderer: TrackRenderer = null
 var runtime: TrackRuntime = null
 var undo_stack := TrackUndoStack.new()
 var edit_ops := TrackEditOps.new()
+var draw_tool := DrawTrackTool.new()
+var route_ops := RouteOps.new()
 var current_tool_index := 0
+var road_width := "standard"
 var cursor_cell := Vector2i(6, 6)
 var enabled := false
 var checkpoint_sequence := 0
@@ -29,6 +33,8 @@ var selection_active := false
 var selection_start := Vector2i.ZERO
 var selection_end := Vector2i.ZERO
 var clipboard: Dictionary = {}
+var drawing_path := false
+var draw_samples: Array[Vector2i] = []
 var _last_painted := Vector2i(-9999, -9999)
 
 func setup(source_track, source_renderer: TrackRenderer, source_runtime: TrackRuntime, source_camera: Camera2D) -> void:
@@ -43,6 +49,9 @@ func setup(source_track, source_renderer: TrackRenderer, source_runtime: TrackRu
 
 func set_enabled(value: bool) -> void:
 	enabled = value
+	paint_held = false
+	drawing_path = false
+	draw_samples.clear()
 	if renderer != null:
 		renderer.cursor_visible = value
 		renderer.queue_redraw()
@@ -68,6 +77,12 @@ func set_tool(tool_name: String) -> void:
 func cycle_tool(direction: int) -> void:
 	current_tool_index = posmod(current_tool_index + direction, TOOLS.size())
 	tool_changed.emit(current_tool())
+
+func cycle_width(direction: int = 1) -> void:
+	var index := DrawTrackTool.WIDTHS.find(road_width)
+	road_width = DrawTrackTool.WIDTHS[posmod(index + direction, DrawTrackTool.WIDTHS.size())]
+	width_changed.emit(road_width)
+	track_changed.emit()
 
 func rotate_barrier() -> void:
 	barrier_rotation = posmod(barrier_rotation + 1, 4)
@@ -156,6 +171,9 @@ func eyedropper() -> void:
 	var tool := str(sample.get("tool", ""))
 	if tool == "barrier":
 		barrier_rotation = int(sample.get("rotation_steps", 0))
+	if tool == "road":
+		road_width = str(track.get_road(cursor_cell).get("width", "standard"))
+		width_changed.emit(road_width)
 	if tool in TOOLS:
 		set_tool(tool)
 
@@ -177,7 +195,7 @@ func _process(delta: float) -> void:
 		load_requested.emit()
 	if Input.is_action_just_pressed("toggle_test"):
 		test_requested.emit()
-	if Input.is_action_just_pressed("builder_place"):
+	if Input.is_action_just_pressed("builder_place") and current_tool() != "draw_road":
 		_place_current()
 	if Input.is_action_just_pressed("builder_erase"):
 		_erase_current()
@@ -194,7 +212,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		if selection_drag:
 			selection_end = _clamp_cell(cursor_cell)
 			_update_selection_overlay()
-		elif paint_held and cursor_cell != _last_painted and current_tool() in ["road", "sand", "dirt", "grass", "erase"]:
+		elif drawing_path:
+			var sampled := _clamp_cell(cursor_cell)
+			if draw_samples.is_empty() or draw_samples.back() != sampled:
+				draw_samples.append(sampled)
+		elif paint_held and cursor_cell != _last_painted and current_tool() in ["road", "pit", "sand", "dirt", "grass", "erase"]:
 			_place_current()
 	elif event is InputEventMouseButton:
 		var mouse := event as InputEventMouseButton
@@ -204,6 +226,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if mouse.shift_pressed:
 				if mouse.pressed:
 					paint_held = false
+					drawing_path = false
 					selection_drag = true
 					selection_active = true
 					selection_start = _clamp_cell(cursor_cell)
@@ -211,6 +234,11 @@ func _unhandled_input(event: InputEvent) -> void:
 					_update_selection_overlay()
 				else:
 					selection_drag = false
+			elif current_tool() == "draw_road":
+				if mouse.pressed:
+					_begin_draw_path()
+				else:
+					_finish_draw_path()
 			else:
 				paint_held = mouse.pressed
 				if mouse.pressed:
@@ -236,26 +264,48 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		match key.physical_keycode:
 			KEY_1: set_tool("road")
-			KEY_2: set_tool("sand")
-			KEY_3: set_tool("dirt")
-			KEY_4: set_tool("grass")
-			KEY_5: set_tool("start_finish")
-			KEY_6: set_tool("checkpoint")
-			KEY_7: set_tool("barrier")
-			KEY_8: set_tool("erase")
+			KEY_2: set_tool("draw_road")
+			KEY_3: set_tool("pit")
+			KEY_4: set_tool("sand")
+			KEY_5: set_tool("dirt")
+			KEY_6: set_tool("grass")
+			KEY_7: set_tool("start_finish")
+			KEY_8: set_tool("checkpoint")
+			KEY_9: set_tool("barrier")
+			KEY_0: set_tool("erase")
 			KEY_X: eyedropper()
 			KEY_R: rotate_clipboard()
 			KEY_M: mirror_clipboard()
+			KEY_T: cycle_width(1)
 			KEY_DELETE: delete_selection()
 			KEY_ESCAPE: clear_selection()
 			_: pass
+
+func _begin_draw_path() -> void:
+	if not track.in_bounds(cursor_cell):
+		return
+	undo_stack.record_before(track)
+	drawing_path = true
+	draw_samples = [_clamp_cell(cursor_cell)]
+
+func _finish_draw_path() -> void:
+	if not drawing_path:
+		return
+	drawing_path = false
+	if draw_samples.size() >= 2:
+		draw_tool.draw_cells(track, draw_samples, "asphalt", road_width)
+		_after_edit()
+	draw_samples.clear()
 
 func _place_current() -> void:
 	if not track.in_bounds(cursor_cell):
 		return
 	undo_stack.record_before(track)
 	match current_tool():
-		"road": track.set_road(cursor_cell, "asphalt")
+		"road": track.set_road(cursor_cell, "asphalt", road_width)
+		"pit":
+			track.set_road(cursor_cell, "asphalt", road_width)
+			route_ops.mark_pit_lane(track, [cursor_cell])
 		"sand": track.set_terrain(cursor_cell, "sand")
 		"dirt": track.set_terrain(cursor_cell, "dirt")
 		"grass": track.set_terrain(cursor_cell, "grass")
