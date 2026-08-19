@@ -77,6 +77,16 @@ jobs:
           /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
             --headless --path . --script res://tests/run_sharing_tests.gd
 
+      - name: Run save recovery tests
+        run: |
+          /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path . --script res://tests/run_save_recovery_tests.gd
+
+      - name: Run ghost persistence tests
+        run: |
+          /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
+            --headless --path . --script res://tests/run_ghost_persistence_tests.gd
+
       - name: Run deterministic stress tests
         run: |
           /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
