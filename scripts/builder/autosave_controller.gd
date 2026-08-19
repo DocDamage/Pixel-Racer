@@ -6,20 +6,21 @@ const DEFAULT_INTERVAL := 25.0
 var game = null
 var interval_seconds := DEFAULT_INTERVAL
 var elapsed_dirty := 0.0
-var previous_mode := -1
+var previous_mode: String = ""
 var last_save_msec := 0
+var _quit_in_progress := false
 
 func _ready() -> void:
 	call_deferred("_bind_game")
 
 func _bind_game() -> void:
 	game = get_parent()
-	previous_mode = GameState.current_mode
+	previous_mode = str(GameState.current_mode)
 
 func _process(delta: float) -> void:
 	if game == null or not is_instance_valid(game):
 		return
-	var current_mode := GameState.current_mode
+	var current_mode: String = str(GameState.current_mode)
 	var track = game.track
 	if previous_mode == GameState.MODE_BUILDER and current_mode != GameState.MODE_BUILDER:
 		_save_dirty_track()
@@ -40,8 +41,12 @@ func seconds_since_last_save() -> float:
 	return float(Time.get_ticks_msec() - last_save_msec) / 1000.0
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+	if what == NOTIFICATION_APPLICATION_PAUSED:
 		_save_dirty_track()
+	elif what == NOTIFICATION_WM_CLOSE_REQUEST and not _quit_in_progress:
+		_quit_in_progress = true
+		_save_dirty_track()
+		get_tree().quit()
 
 func _save_dirty_track() -> bool:
 	if game == null or not is_instance_valid(game) or game.track == null:
