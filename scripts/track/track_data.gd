@@ -216,7 +216,7 @@ func from_dict(data: Dictionary) -> void:
 	for raw in data.get("road_tiles", []):
 		if raw is Dictionary:
 			var cell := Vector2i(int(raw.get("x", 0)), int(raw.get("y", 0)))
-			var road := raw.duplicate(true)
+			var road: Dictionary = raw.duplicate(true)
 			if not road.has("width"):
 				road["width"] = "standard"
 			if not road.has("route_id"):
