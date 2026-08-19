@@ -4,6 +4,7 @@ class_name ArcadeVehicle
 signal nitro_changed(value: float)
 signal drift_score_changed(value: float)
 signal surface_changed(surface: String)
+signal hazard_changed(hazard_id: String, active: bool)
 
 const SettingsAccessScript = preload("res://scripts/utilities/settings_access.gd")
 const SURFACES := {
@@ -38,6 +39,9 @@ var _boost_was_active := false
 var _drift_was_active := false
 var _boost_toggle := false
 var _collision_rumble_cooldown := 0.0
+var _hazard_id := ""
+var _hazard_timer := 0.0
+var _hazard_grip_scale := 1.0
 
 func _ready() -> void:
 	collision_layer = 1
@@ -95,10 +99,36 @@ func set_ai_controls(throttle: float, brake: float, steer: float, handbrake: boo
 		"boost": boost
 	}
 
+func apply_hazard(hazard_id: String, duration: float = 1.0) -> void:
+	if hazard_id != "oil":
+		return
+	var was_active := _hazard_timer > 0.0 and _hazard_id == hazard_id
+	_hazard_id = hazard_id
+	_hazard_timer = maxf(_hazard_timer, clampf(duration, 0.15, 4.0))
+	_hazard_grip_scale = minf(_hazard_grip_scale, 0.38)
+	var side := Vector2.UP.rotated(heading + PI * 0.5)
+	var speed_factor := clampf(velocity.length() / 360.0, 0.25, 1.0)
+	var kick := lerpf(18.0, 62.0, speed_factor)
+	if randf() < 0.5:
+		kick *= -1.0
+	velocity += side * kick
+	if not was_active:
+		hazard_changed.emit(hazard_id, true)
+		_rumble(0.34, 0.16)
+
+func hazard_state() -> Dictionary:
+	return {
+		"id": _hazard_id,
+		"remaining": _hazard_timer,
+		"grip_scale": _hazard_grip_scale,
+		"active": _hazard_timer > 0.0
+	}
+
 func reset_to_last_valid() -> void:
 	global_position = last_valid_position
 	velocity = Vector2.ZERO
 	_boost_toggle = false
+	_clear_hazard()
 	set_collision_layer_value(1, false)
 	get_tree().create_timer(0.6).timeout.connect(func(): set_collision_layer_value(1, true))
 
@@ -106,6 +136,7 @@ func _physics_process(delta: float) -> void:
 	if track == null:
 		return
 	_collision_rumble_cooldown = maxf(0.0, _collision_rumble_cooldown - delta)
+	_update_hazard(delta)
 	var controls := _read_controls()
 	var stats: Dictionary = definition.get("stats", {})
 	var tuning: Dictionary = definition.get("tuning", {})
@@ -144,6 +175,7 @@ func _physics_process(delta: float) -> void:
 		grip *= lerpf(0.22, 0.52, drift_stat) * lerpf(0.80, 1.14, tuning_drift_assist) * lerpf(0.86, 1.08, accessibility_drift_assist)
 	elif bool(SettingsAccessScript.get_value("traction_assist", true)) and input_enabled:
 		grip *= 1.12
+	grip *= _hazard_grip_scale
 	lateral_speed = move_toward(lateral_speed, 0.0, absf(lateral_speed) * grip * delta)
 	var speed_ratio := clampf(absf(forward_speed) / maxf(1.0, max_speed), 0.0, 1.0)
 	var steering_scale := lerpf(0.42, 1.0, clampf(speed_ratio * 2.0, 0.0, 1.0)) * lerpf(1.0, 0.66, maxf(0.0, speed_ratio - 0.75) / 0.25)
@@ -228,6 +260,20 @@ func _apply_track_edge_assist(delta: float) -> void:
 	if correction.length() > track.cell_size * 2.25 or correction.length() < 1.0:
 		return
 	velocity += correction.normalized() * 95.0 * delta
+
+func _update_hazard(delta: float) -> void:
+	if _hazard_timer <= 0.0:
+		return
+	_hazard_timer = maxf(0.0, _hazard_timer - delta)
+	if _hazard_timer <= 0.0:
+		_clear_hazard()
+
+func _clear_hazard() -> void:
+	if not _hazard_id.is_empty():
+		hazard_changed.emit(_hazard_id, false)
+	_hazard_id = ""
+	_hazard_timer = 0.0
+	_hazard_grip_scale = 1.0
 
 func _update_drift(delta: float, forward_speed: float, lateral_speed: float) -> void:
 	var slip := absf(lateral_speed)

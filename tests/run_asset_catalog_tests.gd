@@ -5,6 +5,7 @@ const BuilderCatalogScript = preload("res://scripts/assets/builder_asset_catalog
 const ThemeCatalogScript = preload("res://scripts/assets/visual_theme_catalog.gd")
 const TeamCatalogScript = preload("res://scripts/assets/team_catalog.gd")
 const SpriteFactoryScript = preload("res://scripts/assets/asset_sprite_factory.gd")
+const ArcadeVehicleScript = preload("res://scripts/vehicles/arcade_vehicle.gd")
 
 var failures := 0
 
@@ -13,6 +14,7 @@ func _init() -> void:
 	_test_builder_catalog()
 	_test_themes_and_teams()
 	_test_atlas_sprite_factory()
+	_test_oil_hazard_state()
 	if failures == 0:
 		print("Pixel Track Works asset catalog tests: PASS")
 		quit(0)
@@ -59,6 +61,23 @@ func _test_atlas_sprite_factory() -> void:
 		_expect(sprite.region_enabled, "atlas-backed sprite uses explicit region")
 		_expect(Vector2i(sprite.region_rect.size) == Vector2i(48, 48), "atlas region retains approved runtime dimensions")
 		sprite.free()
+
+func _test_oil_hazard_state() -> void:
+	var vehicle = ArcadeVehicleScript.new()
+	vehicle.input_enabled = false
+	vehicle.heading = 0.0
+	vehicle.velocity = Vector2(0.0, -240.0)
+	var before := vehicle.velocity
+	vehicle.apply_hazard("oil", 1.35)
+	var state: Dictionary = vehicle.hazard_state()
+	_expect(bool(state.get("active", false)), "oil hazard activates a temporary vehicle state")
+	_expect(float(state.get("grip_scale", 1.0)) < 0.5, "oil hazard temporarily reduces grip")
+	_expect(vehicle.velocity != before, "oil hazard applies a bounded lateral slip kick")
+	vehicle._update_hazard(2.0)
+	state = vehicle.hazard_state()
+	_expect(not bool(state.get("active", true)), "oil hazard expires without changing TrackData")
+	_expect(is_equal_approx(float(state.get("grip_scale", 0.0)), 1.0), "grip is restored after oil hazard expires")
+	vehicle.free()
 
 func _expect(condition: bool, label: String) -> void:
 	if condition:
