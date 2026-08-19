@@ -15,6 +15,7 @@ var boosting := false
 var surface := "asphalt"
 var impact_envelope := 0.0
 var enabled := false
+var collision_fx: CollisionFX
 
 func start() -> void:
 	if enabled:
@@ -30,6 +31,7 @@ func start() -> void:
 	add_child(player)
 	player.play()
 	playback = player.get_stream_playback() as AudioStreamGeneratorPlayback
+	_ensure_collision_fx()
 	_fill_buffer()
 
 func stop() -> void:
@@ -47,7 +49,18 @@ func update_state(normalized_speed: float, throttle_input: float, is_drifting: b
 	_fill_buffer()
 
 func trigger_impact(strength: float) -> void:
-	impact_envelope = maxf(impact_envelope, clampf(strength, 0.0, 1.0))
+	var resolved := clampf(strength, 0.0, 1.0)
+	impact_envelope = maxf(impact_envelope, resolved)
+	if resolved <= 0.01:
+		return
+	_ensure_collision_fx()
+	if collision_fx == null:
+		return
+	var vehicle := get_parent() as ArcadeVehicle
+	if vehicle == null:
+		return
+	var away := -vehicle.velocity.normalized() if vehicle.velocity.length_squared() > 1.0 else Vector2.UP.rotated(vehicle.heading + PI)
+	collision_fx.emit_impact(vehicle.global_position, away, resolved)
 
 func _process(delta: float) -> void:
 	if enabled:
@@ -84,3 +97,16 @@ func _fill_buffer() -> void:
 		playback.push_frame(Vector2(sample, sample))
 		phase = fposmod(phase + base_increment, 1.0)
 		harmonic_phase = fposmod(harmonic_phase + harmonic_increment, 1.0)
+
+func _ensure_collision_fx() -> void:
+	if collision_fx != null and is_instance_valid(collision_fx):
+		return
+	var existing := get_tree().get_first_node_in_group("collision_fx")
+	if existing is CollisionFX:
+		collision_fx = existing
+		return
+	if get_tree().current_scene == null:
+		return
+	collision_fx = CollisionFX.new()
+	collision_fx.name = "CollisionFX"
+	get_tree().current_scene.add_child(collision_fx)
