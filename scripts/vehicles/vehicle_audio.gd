@@ -13,6 +13,7 @@ var throttle := 0.0
 var drifting := false
 var boosting := false
 var surface := "asphalt"
+var impact_envelope := 0.0
 var enabled := false
 
 func start() -> void:
@@ -45,8 +46,12 @@ func update_state(normalized_speed: float, throttle_input: float, is_drifting: b
 	surface = surface_name
 	_fill_buffer()
 
-func _process(_delta: float) -> void:
+func trigger_impact(strength: float) -> void:
+	impact_envelope = maxf(impact_envelope, clampf(strength, 0.0, 1.0))
+
+func _process(delta: float) -> void:
 	if enabled:
+		impact_envelope = move_toward(impact_envelope, 0.0, delta * 4.5)
 		_fill_buffer()
 
 func _fill_buffer() -> void:
@@ -73,7 +78,9 @@ func _fill_buffer() -> void:
 		engine_sample += sin(harmonic_phase * TAU) * engine_level * 0.34
 		var tire_sample := randf_range(-1.0, 1.0) * tire_level
 		var boost_sample := sin(harmonic_phase * TAU * 1.91) * boost_level
-		var sample := clampf((engine_sample + tire_sample + boost_sample) * sfx_volume, -0.42, 0.42)
+		var impact_noise := randf_range(-1.0, 1.0) * impact_envelope * 0.26
+		var impact_thump := sin(phase * TAU * 0.37) * impact_envelope * 0.16
+		var sample := clampf((engine_sample + tire_sample + boost_sample + impact_noise + impact_thump) * sfx_volume, -0.48, 0.48)
 		playback.push_frame(Vector2(sample, sample))
 		phase = fposmod(phase + base_increment, 1.0)
 		harmonic_phase = fposmod(harmonic_phase + harmonic_increment, 1.0)
