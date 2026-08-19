@@ -36,10 +36,16 @@ jobs:
           chmod +x /tmp/godot/Godot_v4.7.1-stable_linux.x86_64
           /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --version
 
-      - name: Import project and parse scripts
+      - name: Import project and reject script errors
+        shell: bash
         run: |
+          set -o pipefail
           /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
-            --headless --editor --path . --quit-after 2
+            --headless --editor --path . --quit-after 2 2>&1 | tee /tmp/godot-import.log
+          if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script' /tmp/godot-import.log; then
+            echo 'Godot reported a script/import error.' >&2
+            exit 1
+          fi
 
       - name: Run core tests
         run: |
@@ -87,16 +93,28 @@ jobs:
           mkdir -p "$HOME/.local/share/godot/export_templates/4.7.1.stable"
           cp -R /tmp/templates/templates/. "$HOME/.local/share/godot/export_templates/4.7.1.stable/"
 
-      - name: Import project
+      - name: Import project and reject script errors
+        shell: bash
         run: |
+          set -o pipefail
           /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
-            --headless --editor --path . --quit-after 2
+            --headless --editor --path . --quit-after 2 2>&1 | tee /tmp/godot-export-import.log
+          if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script' /tmp/godot-export-import.log; then
+            echo 'Godot reported a script/import error before export.' >&2
+            exit 1
+          fi
 
-      - name: Export Windows release
+      - name: Export Windows release and reject script errors
+        shell: bash
         run: |
+          set -o pipefail
           mkdir -p build
           /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 \
-            --headless --path . --export-release "Windows Desktop" build/PixelTrackWorks.exe
+            --headless --path . --export-release "Windows Desktop" build/PixelTrackWorks.exe 2>&1 | tee /tmp/godot-export.log
+          if grep -E 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script' /tmp/godot-export.log; then
+            echo 'Godot reported a script error during export.' >&2
+            exit 1
+          fi
           test -s build/PixelTrackWorks.exe
           cd build
           zip -9 PixelTrackWorks-Windows-x64.zip PixelTrackWorks.exe
@@ -119,3 +137,33 @@ jobs:
             build/PixelTrackWorks-Windows-x64.zip.sha256
           if-no-files-found: error
           retention-days: 14
+
+  windows-smoke:
+    needs: windows-export
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download packaged Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: PixelTrackWorks-Windows-x64
+          path: build
+
+      - name: Boot packaged executable headlessly
+        shell: pwsh
+        run: |
+          Expand-Archive -Path build\PixelTrackWorks-Windows-x64.zip -DestinationPath app -Force
+          $stdout = Join-Path $PWD 'smoke-stdout.log'
+          $stderr = Join-Path $PWD 'smoke-stderr.log'
+          $exe = Join-Path $PWD 'app\PixelTrackWorks.exe'
+          if (-not (Test-Path $exe)) { throw 'PixelTrackWorks.exe missing after extraction.' }
+          $process = Start-Process -FilePath $exe -ArgumentList @('--headless','--quit-after','2') -PassThru -Wait -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          if (Test-Path $stdout) { Get-Content $stdout }
+          if (Test-Path $stderr) { Get-Content $stderr }
+          if ($process.ExitCode -ne 0) { throw "Packaged executable exited with code $($process.ExitCode)." }
+          $combined = ''
+          if (Test-Path $stdout) { $combined += (Get-Content $stdout -Raw) }
+          if (Test-Path $stderr) { $combined += (Get-Content $stderr -Raw) }
+          if ($combined -match 'SCRIPT ERROR:|Parse Error:|Compile Error:|Failed to load script') {
+            throw 'Packaged executable reported a script error.'
+          }
