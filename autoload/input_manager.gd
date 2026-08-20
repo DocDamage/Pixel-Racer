@@ -9,6 +9,7 @@ const ACTIONS := {
 	"handbrake": [KEY_SPACE],
 	"boost": [KEY_SHIFT],
 	"reset_vehicle": [KEY_R],
+	"pause": [KEY_ESCAPE],
 	"toggle_test": [KEY_F5],
 	"builder_undo": [KEY_Z],
 	"builder_redo": [KEY_Y],
@@ -40,6 +41,7 @@ func install_defaults() -> void:
 	_add_joy_button("handbrake", JOY_BUTTON_B)
 	_add_joy_button("boost", JOY_BUTTON_A)
 	_add_joy_button("reset_vehicle", JOY_BUTTON_Y)
+	_add_joy_button("pause", JOY_BUTTON_START)
 	_add_joy_button("toggle_test", JOY_BUTTON_START)
 	_add_joy_button("builder_place", JOY_BUTTON_A)
 	_add_joy_button("builder_erase", JOY_BUTTON_B)

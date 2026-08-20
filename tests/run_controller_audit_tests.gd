@@ -49,6 +49,18 @@ func _test_runtime_focusability() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_audit_focus(instance)
+	var pause_controller := instance.get_node_or_null("PauseController")
+	_expect(pause_controller != null, "main runtime includes the pause controller")
+	if pause_controller != null:
+		GameState.set_mode(GameState.MODE_RACE)
+		_expect(bool(pause_controller.call("pause_game")), "pause controller pauses from a driving mode")
+		_expect(get_tree().paused, "scene tree is paused during the pause menu")
+		_expect(bool(pause_controller.call("is_pause_visible")), "pause menu is visible while paused")
+		_expect(bool(pause_controller.call("resume_game", false)), "pause controller resumes gameplay")
+		_expect(not get_tree().paused, "scene tree resumes after closing the pause menu")
+		GameState.set_mode(GameState.MODE_MENU)
+	if get_tree().paused:
+		get_tree().paused = false
 	instance.queue_free()
 	await get_tree().process_frame
 
