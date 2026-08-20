@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "comparison": {
+    "canonical_archive": "craftpix-889156-free-racing-game-kit(1).zip",
+    "supplemental_archive": "craftpix-099511-free-race-track-2d-game-tile-set(1).zip",
+    "canonical_png_count": 286,
+    "supplemental_png_count": 74,
+    "exact_duplicate_png_count": 69,
+    "supplemental_unique_png_count": 5,
+    "method": "sha256_of_uncompressed_png_bytes"
+  },
+  "policy": "Keep the larger Racing Game Kit copy for exact duplicates; import only the five unique PNGs from the smaller track pack.",
+  "supplemental_unique_pngs": [
+    {
+      "path": "PNG/Decor/Bush_02.png",
+      "size": [600, 518],
+      "sha256": "481ac756ec0ca785d2bd49d2f77ba16f48b0697375d9288357c74e7cd98383c8"
+    },
+    {
+      "path": "PNG/Decor/Decor_Building_02.png",
+      "size": [766, 1000],
+      "sha256": "c4fce49c6dea37ecc5544c22c3619b3cc7d2cb68f065f3005d51eab42397d0bf"
+    },
+    {
+      "path": "PNG/Decor/Pavilion_02.png",
+      "size": [1270, 683],
+      "sha256": "b91e12e26271ff7bb54d20f590cdc3f5d227259c7288ce6ed511f9759edbb165"
+    },
+    {
+      "path": "PNG/Decor/Rock_02.png",
+      "size": [720, 272],
+      "sha256": "b940e4e746996d546fa01a4baade16618b1995665af1e6bd50e218e206670b28"
+    },
+    {
+      "path": "PNG/Decor/Tree_01.png",
+      "size": [950, 816],
+      "sha256": "ff8f34f5071f556055d0ee055d53f664fba18c8064ee7589a6cddeb85cd2d0f3"
+    }
+  ],
+  "full_duplicate_map": "Regenerate deterministically with tools/asset_pipeline/inventory_assets.py when the protected source archives are present."
+}

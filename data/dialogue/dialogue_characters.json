@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "characters": [
+    {"id": "crew_chief", "display_name": "Crew Chief", "portrait_id": "crew_chief", "role": "race guidance", "voice_profile": "radio", "radio_enabled": true},
+    {"id": "spotter", "display_name": "Spotter", "portrait_id": "spotter", "role": "race awareness", "voice_profile": "radio", "radio_enabled": true},
+    {"id": "rival", "display_name": "Rival", "portrait_id": "rival", "role": "rival driver", "voice_profile": "rival", "radio_enabled": true},
+    {"id": "mechanic", "display_name": "Mechanic", "portrait_id": "mechanic", "role": "garage and tuning", "voice_profile": "paddock", "radio_enabled": false},
+    {"id": "builder", "display_name": "Track Builder", "portrait_id": "builder", "role": "builder guidance", "voice_profile": "paddock", "radio_enabled": false},
+    {"id": "event_host", "display_name": "Event Control", "portrait_id": "event_host", "role": "event briefing", "voice_profile": "announcer", "radio_enabled": true}
+  ]
+}

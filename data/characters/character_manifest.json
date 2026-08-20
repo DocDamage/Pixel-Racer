@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "measured": false,
+  "expected_assets": {
+    "body_idle_right": "res://assets/characters/body/Body-Idle-Right.png",
+    "body_running_right": "res://assets/characters/body/Body-Running-Right.png",
+    "head_idle_right": "res://assets/characters/head/Head-Idle-Right.png",
+    "head_running_right": "res://assets/characters/head/Head-Running-Right.png",
+    "portraits": "res://assets/characters/portraits/PORTRAITS.png"
+  },
+  "characters": [],
+  "portraits": {
+    "atlas_path": "res://assets/characters/portraits/PORTRAITS.png",
+    "measured": false,
+    "regions": {}
+  },
+  "notes": "The five source PNGs named in the V1 handoff are not committed on this branch yet. Keep measured=false and regions/cell geometry empty until the actual PNG dimensions and atlas cells are measured from the source files; do not infer or guess them."
+}
