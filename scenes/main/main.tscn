@@ -1,7 +1,7 @@
 [gd_scene load_steps=12 format=3]
 
 [ext_resource path="res://scripts/main/catalog_game_root.gd" type="Script" id="1_root"]
-[ext_resource path="res://scripts/ui/race_standings_ui.gd" type="Script" id="2_standings"]
+[ext_resource path="res://scripts/ui/catalog_race_standings_ui.gd" type="Script" id="2_standings"]
 [ext_resource path="res://scripts/ui/championship_ui.gd" type="Script" id="3_championships"]
 [ext_resource path="res://scripts/builder/autosave_controller.gd" type="Script" id="4_autosave"]
 [ext_resource path="res://scripts/audio/ui_audio.gd" type="Script" id="5_ui_audio"]
