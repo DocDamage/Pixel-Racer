@@ -2,6 +2,7 @@ extends BuilderController
 class_name CatalogBuilderController
 
 signal catalog_asset_changed(asset_id: String, display_name: String)
+signal theme_cycle_requested(direction: int)
 
 var asset_catalog := BuilderAssetCatalog.new()
 var selected_catalog_asset := ""
@@ -87,14 +88,23 @@ func _unhandled_input(event: InputEvent) -> void:
 	if enabled:
 		if event is InputEventKey:
 			var key := event as InputEventKey
-			if key.pressed and not key.echo and not key.ctrl_pressed and key.physical_keycode == KEY_C:
-				cycle_catalog_asset(-1 if key.shift_pressed else 1)
-				get_viewport().set_input_as_handled()
-				return
+			if key.pressed and not key.echo and not key.ctrl_pressed:
+				if key.physical_keycode == KEY_C:
+					cycle_catalog_asset(-1 if key.shift_pressed else 1)
+					get_viewport().set_input_as_handled()
+					return
+				if key.physical_keycode == KEY_V:
+					theme_cycle_requested.emit(-1 if key.shift_pressed else 1)
+					get_viewport().set_input_as_handled()
+					return
 		elif event is InputEventJoypadButton:
 			var button := event as InputEventJoypadButton
 			if button.pressed and button.button_index == JOY_BUTTON_Y:
 				cycle_catalog_asset(1)
+				get_viewport().set_input_as_handled()
+				return
+			if button.pressed and button.button_index == JOY_BUTTON_BACK:
+				theme_cycle_requested.emit(1)
 				get_viewport().set_input_as_handled()
 				return
 	super._unhandled_input(event)
