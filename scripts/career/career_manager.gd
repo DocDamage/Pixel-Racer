@@ -1,6 +1,10 @@
 extends RefCounted
 class_name CareerManager
 
+signal contract_claimed(contract_id: String, credits: int, reputation: int)
+signal championship_completed(championship_id: String, credits: int, reputation: int)
+signal tier_changed(previous_tier: int, current_tier: int)
+
 const PROFILE_PATH := "user://career.json"
 const TIERS := {
 	1: {"name": "Backyard Racer", "min_rep": 0, "construction": ["asphalt", "grass", "sand", "barrier"], "classes": ["Drift", "Sports"]},
@@ -12,19 +16,9 @@ const TIERS := {
 	7: {"name": "Track Architect", "min_rep": 5500, "construction": ["all_builder_tools", "large_maps", "multi_route"], "classes": ["Novelty"]}
 }
 
-var profile: Dictionary = {
-	"credits": 1500,
-	"reputation": 0,
-	"tier": 1,
-	"venue_level": 1,
-	"owned_vehicles": ["Hachiroku_Drifter"],
-	"unlocked_surfaces": ["asphalt", "grass", "sand"],
-	"unlocked_construction": ["asphalt", "grass", "sand", "barrier"],
-	"unlocked_vehicle_classes": ["Drift", "Sports"],
-	"completed_contracts": [],
-	"completed_championships": [],
-	"sponsor_streak": 0
-}
+var profile: Dictionary = {}
+var _profile_path := PROFILE_PATH
+var _store := AtomicJsonStore.new()
 
 var contracts := [
 	{"id": "first_loop", "tier": 1, "name": "Local Club Request", "reward": 750, "rep": 100, "min_corners": 4, "max_tiles": 150},
@@ -49,26 +43,29 @@ var championships := [
 	{"id": "architect_finale", "tier": 7, "name": "Track Architect Finale", "reward": 15000, "rep": 1800}
 ]
 
-func _init() -> void:
+func _init(profile_path: String = PROFILE_PATH) -> void:
+	_profile_path = PROFILE_PATH if profile_path.is_empty() else profile_path
+	profile = _default_profile()
 	load_profile()
 
+func storage_path() -> String:
+	return _profile_path
+
 func load_profile() -> void:
-	if FileAccess.file_exists(PROFILE_PATH):
-		var file := FileAccess.open(PROFILE_PATH, FileAccess.READ)
-		if file != null:
-			var parsed = JSON.parse_string(file.get_as_text())
-			if parsed is Dictionary:
-				for key in profile:
-					if parsed.has(key):
-						profile[key] = parsed[key]
+	profile = _default_profile()
+	var result: Dictionary = _store.load_result(_profile_path)
+	var loaded_value: Variant = result.get("data", {})
+	if loaded_value is Dictionary:
+		var loaded: Dictionary = loaded_value
+		_merge_loaded_profile(loaded)
+	_normalize_profile()
 	_update_tier_and_unlocks()
+	if not str(result.get("recovered_from", "")).is_empty():
+		save_profile()
 
 func save_profile() -> bool:
-	var file := FileAccess.open(PROFILE_PATH, FileAccess.WRITE)
-	if file == null:
-		return false
-	file.store_string(JSON.stringify(profile, "\t"))
-	return true
+	var payload: Dictionary = profile.duplicate(true)
+	return _store.save(_profile_path, payload)
 
 func tier_info(tier: int = -1) -> Dictionary:
 	var resolved := int(profile.get("tier", 1)) if tier < 0 else tier
@@ -122,12 +119,20 @@ func claim_contract(contract_id: String, track: TrackData) -> bool:
 		var evaluation := evaluate_contract(contract, track)
 		if not bool(evaluation["complete"]):
 			return false
-		profile["credits"] = int(profile["credits"]) + int(contract.get("reward", 0))
-		profile["reputation"] = int(profile["reputation"]) + int(contract.get("rep", 0))
+		var previous: Dictionary = profile.duplicate(true)
+		var previous_tier := int(profile.get("tier", 1))
+		var reward := int(contract.get("reward", 0))
+		var reputation := int(contract.get("rep", 0))
+		profile["credits"] = int(profile["credits"]) + reward
+		profile["reputation"] = int(profile["reputation"]) + reputation
 		profile["completed_contracts"].append(contract_id)
 		profile["venue_level"] = maxi(int(profile.get("venue_level", 1)), int(contract.get("tier", 1)))
 		_update_tier_and_unlocks()
-		save_profile()
+		if not save_profile():
+			profile = previous
+			return false
+		contract_claimed.emit(contract_id, reward, reputation)
+		_emit_tier_change(previous_tier)
 		return true
 	return false
 
@@ -139,25 +144,70 @@ func complete_championship(championship_id: String, placement: int) -> bool:
 			continue
 		if int(championship.get("tier", 1)) > int(profile.get("tier", 1)):
 			return false
-		profile["credits"] = int(profile["credits"]) + int(championship.get("reward", 0))
-		profile["reputation"] = int(profile["reputation"]) + int(championship.get("rep", 0))
+		var previous: Dictionary = profile.duplicate(true)
+		var previous_tier := int(profile.get("tier", 1))
+		var reward := int(championship.get("reward", 0))
+		var reputation := int(championship.get("rep", 0))
+		profile["credits"] = int(profile["credits"]) + reward
+		profile["reputation"] = int(profile["reputation"]) + reputation
 		profile["completed_championships"].append(championship_id)
 		profile["sponsor_streak"] = int(profile.get("sponsor_streak", 0)) + 1
 		_update_tier_and_unlocks()
-		save_profile()
+		if not save_profile():
+			profile = previous
+			return false
+		championship_completed.emit(championship_id, reward, reputation)
+		_emit_tier_change(previous_tier)
 		return true
 	return false
 
 func spend_credits(amount: int) -> bool:
 	if amount < 0 or int(profile.get("credits", 0)) < amount:
 		return false
+	var previous: Dictionary = profile.duplicate(true)
 	profile["credits"] = int(profile["credits"]) - amount
-	save_profile()
+	if not save_profile():
+		profile = previous
+		return false
 	return true
 
 func grant_credits(amount: int) -> void:
+	var previous: Dictionary = profile.duplicate(true)
 	profile["credits"] = maxi(0, int(profile.get("credits", 0)) + amount)
-	save_profile()
+	if not save_profile():
+		profile = previous
+
+func _default_profile() -> Dictionary:
+	return {
+		"credits": 1500,
+		"reputation": 0,
+		"tier": 1,
+		"venue_level": 1,
+		"owned_vehicles": ["Hachiroku_Drifter"],
+		"unlocked_surfaces": ["asphalt", "grass", "sand"],
+		"unlocked_construction": ["asphalt", "grass", "sand", "barrier"],
+		"unlocked_vehicle_classes": ["Drift", "Sports"],
+		"completed_contracts": [],
+		"completed_championships": [],
+		"sponsor_streak": 0
+	}
+
+func _merge_loaded_profile(loaded: Dictionary) -> void:
+	for key in profile:
+		if not loaded.has(key):
+			continue
+		var value: Variant = loaded[key]
+		profile[key] = value.duplicate(true) if value is Array or value is Dictionary else value
+
+func _normalize_profile() -> void:
+	profile["credits"] = maxi(0, int(profile.get("credits", 0)))
+	profile["reputation"] = maxi(0, int(profile.get("reputation", 0)))
+	profile["tier"] = clampi(int(profile.get("tier", 1)), 1, 7)
+	profile["venue_level"] = maxi(1, int(profile.get("venue_level", 1)))
+	profile["sponsor_streak"] = maxi(0, int(profile.get("sponsor_streak", 0)))
+	for key in ["owned_vehicles", "unlocked_surfaces", "unlocked_construction", "unlocked_vehicle_classes", "completed_contracts", "completed_championships"]:
+		if not profile.get(key, []) is Array:
+			profile[key] = _default_profile()[key]
 
 func _update_tier_and_unlocks() -> void:
 	var rep := int(profile.get("reputation", 0))
@@ -182,3 +232,8 @@ func _update_tier_and_unlocks() -> void:
 		surfaces.append("dirt")
 		surfaces.append("gravel")
 	profile["unlocked_surfaces"] = surfaces
+
+func _emit_tier_change(previous_tier: int) -> void:
+	var current_tier := int(profile.get("tier", 1))
+	if current_tier != previous_tier:
+		tier_changed.emit(previous_tier, current_tier)
