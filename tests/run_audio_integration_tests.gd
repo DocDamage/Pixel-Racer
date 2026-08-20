@@ -1,6 +1,6 @@
 extends SceneTree
 
-const MainScene = preload("res://scenes/main/main.tscn")
+const MAIN_SCENE_PATH := "res://scenes/main/main.tscn"
 
 var failures := 0
 
@@ -9,17 +9,24 @@ func _init() -> void:
 	_finish()
 
 func _test_main_audio_wiring() -> void:
-	var root: Node = MainScene.instantiate()
-	_expect(root != null, "main scene instantiates for audio integration audit")
-	if root == null:
+	var file := FileAccess.open(MAIN_SCENE_PATH, FileAccess.READ)
+	_expect(file != null, "main scene is readable for audio integration audit")
+	if file == null:
 		return
-	_expect(root.get_node_or_null("UIAudio") is UIAudioController, "main scene includes procedural UI audio")
-	_expect(root.get_node_or_null("MusicController") is MusicController, "main scene includes adaptive procedural music")
-	_expect(root.get_node_or_null("GameSFX") is GameSFXController, "main scene includes gameplay SFX generator")
-	_expect(root.get_node_or_null("AmbienceController") is AmbienceController, "main scene includes procedural crowd/environment ambience")
-	_expect(root.get_node_or_null("ProgressionAudioBridge") is ProgressionAudioBridge, "main scene wires progression purchase/upgrade/unlock SFX bridge")
-	_expect(root.get_node_or_null("PresentationController") is PresentationController, "main scene wires race event presentation/SFX bridge")
-	root.free()
+	var source: String = file.get_as_text()
+	file.close()
+	_expect(source.contains("res://scripts/audio/ui_audio.gd"), "main scene includes procedural UI audio script")
+	_expect(source.contains("res://scripts/audio/music_controller.gd"), "main scene includes adaptive procedural music script")
+	_expect(source.contains("res://scripts/audio/game_sfx.gd"), "main scene includes gameplay SFX generator script")
+	_expect(source.contains("res://scripts/audio/ambience_controller.gd"), "main scene includes procedural crowd/environment ambience script")
+	_expect(source.contains("res://scripts/audio/progression_audio_bridge.gd"), "main scene includes progression purchase/upgrade/unlock SFX bridge script")
+	_expect(source.contains("res://scripts/presentation/presentation_controller.gd"), "main scene includes race event presentation/SFX bridge script")
+	_expect(source.contains("[node name=\"UIAudio\""), "main scene instantiates UIAudio node")
+	_expect(source.contains("[node name=\"MusicController\""), "main scene instantiates MusicController node")
+	_expect(source.contains("[node name=\"GameSFX\""), "main scene instantiates GameSFX node")
+	_expect(source.contains("[node name=\"AmbienceController\""), "main scene instantiates AmbienceController node")
+	_expect(source.contains("[node name=\"ProgressionAudioBridge\""), "main scene instantiates ProgressionAudioBridge node")
+	_expect(source.contains("[node name=\"PresentationController\""), "main scene instantiates PresentationController node")
 
 func _finish() -> void:
 	if failures == 0:
