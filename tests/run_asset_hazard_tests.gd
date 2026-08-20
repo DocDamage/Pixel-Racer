@@ -15,7 +15,7 @@ func _test_oil_hazard_state() -> void:
 	vehicle.input_enabled = false
 	vehicle.heading = 0.0
 	vehicle.velocity = Vector2(0.0, -240.0)
-	var before := vehicle.velocity
+	var before: Vector2 = vehicle.velocity
 	vehicle.apply_hazard("oil", 1.35)
 	var state: Dictionary = vehicle.hazard_state()
 	_expect(bool(state.get("active", false)), "oil hazard activates a temporary vehicle state")
