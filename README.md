@@ -1,121 +1,108 @@
 # Pixel Track Works
 
-A Godot 4.7.x top-down arcade racing game and track-construction sandbox built around the **Wheels in Pixels** assets already stored in this repository.
+**Current development version:** `0.9.0-dev.1`
 
-The central product loop runs in one live world:
+Pixel Track Works is a Godot 4.7.x top-down arcade racing game and track-construction sandbox built around the **Wheels in Pixels** foundation and the normalized runtime art catalog in this repository.
+
+The central loop runs in one live world:
 
 **Build → Test Drive → Return to Builder → Adjust → Configure Event → Race → Progress**
 
-Testing an edit does not require exporting a map, reloading the level, or leaving the builder scene.
+Test Drive uses the same world and track data as the Builder. It does not require an export, a scene reload, or a separate test map.
 
 ## Current playable implementation
 
 ### Track builder
-- Authoritative schema-versioned `TrackData` model independent of rendering.
-- Smart N/E/S/W road connection masks.
-- Standard road painting plus freehand **Draw-a-Track**.
-- Narrow / Standard / Wide / Extra Wide road widths.
-- Asphalt, grass, sand, dirt and gravel handling surfaces.
-- Surface painting changes the actual driveable road physics.
-- Start/Finish and ordered checkpoints.
-- Pit and alternate-route classification.
-- Route-aware validation: official main circuit stays a strict closed loop while legal bypasses may leave/rejoin it at two interfaces.
+
+- Schema-versioned authoritative `TrackData` model independent of rendering.
+- Smart N/E/S/W road connections and freehand **Draw-a-Track** rasterization.
+- Narrow, Standard, Wide, and Extra Wide roads.
+- Asphalt, grass, sand, dirt, and gravel handling surfaces.
+- Main, pit, and alternate routes with route-aware validation.
+- Strict closed main circuit plus validated two-interface bypass routes.
 - Pit-lane speed limits and race-time speeding penalties.
-- Cyan pit and amber alternate-route editor indicators.
-- Shift-drag region selection.
-- Copy / cut / paste / rotate / mirror / delete.
-- Eyedropper.
-- Undo / redo.
-- Continuous validation with highlighted issue cells.
-- Track ratings and preview PNG generation.
-- Atomic save/load/delete, JSON import and portable package export.
+- Start/Finish, ordered checkpoints, validation markers, and issue-cell highlighting.
+- Region selection, copy, cut, paste, rotate, mirror, delete, and eyedropper.
+- Undo/redo, track ratings, preview generation, and autosave support.
+- Atomic track save/load/delete with corruption, backup, and interrupted-write recovery.
 
 ### Driving and racing
-- 16-direction vehicle sprites from the bundled asset pack.
-- Existing authored vehicle definitions are read from `js/config/vehicleData.js` rather than replaced.
-- Arcade acceleration, braking, reverse, steering, grip, drag and collision response.
-- Surface-specific handling.
-- Drift scoring, drift-earned nitro, smoke, nitro VFX and skid marks.
-- Controller vibration and configurable camera feedback.
-- Checkpoint-protected laps, penalties and timing.
-- Shared route-aware race progress, live P-position and stable finish order.
-- Live top-five standings overlay.
-- Circuit, Time Trial, Sprint, Checkpoint Rush, Drift Trial and Elimination.
-- Event Setup UI with configurable lap/opponent counts.
-- AI lookahead, curvature speed planning, braking skill, personalities, avoidance, overtaking bias, drafting, boost behavior and stuck recovery.
-- Up to 11 AI opponents / 12 racers total.
 
-### Time Trial, records and ghosts
-- Per-track/per-vehicle/per-mode records.
-- Fixed-interval ghost recording and interpolated visual playback.
-- Existing best ghost loads before Time Trial.
-- Recorder and playback start exactly on GO.
-- Only a faster completed lap atomically replaces the best ghost.
-- Track Library surfaces preview, rating, records and ghost presence.
+- 16-direction vehicle rendering using the bundled vehicle catalog.
+- Existing authored vehicle data from `js/config/vehicleData.js` remains the vehicle source.
+- Arcade acceleration, braking, reverse, speed-aware steering, grip, drag, collision response, and recovery.
+- Surface-specific handling, oil hazards, movable props, skid marks, smoke, and nitro VFX.
+- Drift scoring with collision locks and donut/wall-riding exploit rejection.
+- Circuit, Time Trial, Sprint, Checkpoint Rush, Drift Trial, and Elimination.
+- Event Setup UI with configurable laps and opponents.
+- Shared race progress, checkpoint-protected laps, penalties, live position, and immutable finish order.
+- AI lookahead, curvature speed planning, braking skill, avoidance, drafting, overtaking bias, personality, mistakes, boost use, and stuck recovery.
+- Up to 11 AI opponents for 12 racers total.
 
-### Garage and career
-- Full bundled vehicle roster.
-- Credit-based vehicle purchasing and paint variants.
-- Engine, transmission, tires, brakes, suspension, weight and nitro upgrades.
-- Stock / Street / Sport / Race upgrade tiers.
-- Persistent tuning applied to player physics.
+### Garage, career, and championships
+
+- Full bundled vehicle roster with persistent ownership and color selection.
+- Engine, transmission, tires, brakes, suspension, weight, and nitro upgrades.
+- Stock, Street, Sport, and Race upgrade tiers.
+- Persistent tuning applied to real player physics.
+- Credits, reputation, venue progression, builder contracts, and unlock tables.
 - Seven career tiers from **Backyard Racer** through **Track Architect**.
-- Builder contracts with requirements, credits and reputation.
-- Construction and vehicle-class unlock tables.
-- Seven tier-gated championships.
-- Menu championship selector.
-- P1 race result completes the championship and awards career rewards.
+- Seven tier-gated championships with P1 completion rewards and sponsor streaks.
 
-### Accessibility and settings
-- Persistent keyboard/gamepad remapping.
-- In-game press-next-input rebinding for keys, buttons and axes.
-- UI scale and large text.
-- camera shake.
-- flash intensity.
-- steering sensitivity.
-- auto acceleration and auto braking.
-- traction, drift, recovery and track-edge assists.
-- hold/toggle boost.
-- controller vibration and strength.
-- master/music/SFX volume settings model.
-- windowed/fullscreen/borderless selection.
+### Records, ghosts, and sharing
 
-## Launch
+- Per-track, per-vehicle, and per-mode records.
+- Best Time Trial ghost loading, GO-synchronized recording/playback, and atomic replacement only by a faster completed lap.
+- Track Library cards with preview, rating, records, and ghost state.
+- Modern single-file `.pixeltrack` export, inspection, preview, confirmation, import, and duplicate-ID protection.
+- Legacy JSON remains import-compatible inside the reviewed sharing flow; it is no longer a separate primary user path.
 
-Open the repository root in **Godot 4.7.x** and run the project.
+### Assets and presentation
 
-Internal resolution is **640×360** with nearest-neighbor pixel rendering and 2D pixel snapping.
+- 83 approved logical runtime assets and 31 approved Builder placeables.
+- Four deterministic nearest-neighbor runtime atlases.
+- Native, Club Circuit, and Pro Circuit visual themes with safe fallback where CraftPix orientation is not proven.
+- Data-driven team, driver, avatar, and standings presentation without hidden physics bonuses.
+- Animated crowds and pit-crew strips, dynamic hazards/props, collision effects, and an in-game Asset Gallery.
+- Procedural vehicle audio, gameplay/UI/progression SFX, adaptive music, and ambience.
+- Mode transitions, race presentation, dialogue/radio foundations, and persistent once-only dialogue state.
+
+Character and portrait architecture is present, but the final supplied character source sheets are still required before the visible on-foot/portrait release blocker can be cleared. Missing directional animation is not fabricated.
+
+## Launch from source
+
+Open the repository root in **Godot 4.7.1** and run the project.
+
+The internal presentation target is **640×360**, nearest-neighbor filtered, with 2D transform and vertex pixel snapping.
 
 ## Builder controls
+
+All gameplay actions are rebindable in Settings.
 
 | Action | Keyboard / Mouse | Controller |
 |---|---|---|
 | Place / paint | Left mouse / Enter | A |
 | Erase | Right mouse / Backspace | B |
-| Pan | Arrow keys | Left stick / D-pad UI navigation |
+| Pan | Arrow keys | Left stick |
 | Zoom | Mouse wheel | — |
 | Previous / next tool | Q / E | LB / RB |
-| Road | 1 | toolbar |
-| Draw-a-Track | 2 | toolbar |
-| Pit route | 3 | toolbar |
-| Sand / Dirt / Grass | 4 / 5 / 6 | toolbar |
-| Start / Checkpoint / Barrier | 7 / 8 / 9 | toolbar |
-| Erase tool | 0 | toolbar |
-| Alternate route tool | B | toolbar |
-| Select region | Shift + left-drag | — |
-| Copy / Cut / Paste | Ctrl+C / Ctrl+X / Ctrl+V | UI/context controls |
-| Assign selection to Main / Pit / Alternate | Ctrl+1 / Ctrl+2 / Ctrl+3 | UI/context controls |
-| Rotate / mirror clipboard | R / M | UI/context controls |
-| Cycle road width | T | UI/context controls |
+| Road / Draw / Pit | 1 / 2 / 3 | Toolbar |
+| Sand / Dirt / Grass | 4 / 5 / 6 | Toolbar |
+| Start / Checkpoint / Barrier | 7 / 8 / 9 | Toolbar |
+| Erase tool | 0 | Toolbar |
+| Alternate route | B | Toolbar |
+| Select region | Shift + left-drag | Context UI |
+| Copy / Cut / Paste | Ctrl+C / Ctrl+X / Ctrl+V | Context UI |
+| Main / Pit / Alternate assignment | Ctrl+1 / Ctrl+2 / Ctrl+3 | Context UI |
+| Rotate / mirror clipboard | R / M | Context UI |
+| Cycle road width | T | Context UI |
 | Eyedropper | X / middle mouse | X |
-| Delete selected region | Delete | UI/context controls |
+| Delete selection | Delete | Context UI |
 | Undo / Redo | Z / Y | UI |
 | Save / Load | F2 / F3 | UI |
 | Test Drive | F5 | Start |
 
 ## Driving controls
-
-Defaults are fully rebindable in Settings.
 
 | Action | Keyboard | Controller |
 |---|---|---|
@@ -125,76 +112,84 @@ Defaults are fully rebindable in Settings.
 | Handbrake | Space | B |
 | Nitro | Shift | A |
 | Reset | R | Y |
-| Return from Test Drive | F5 / Esc | Start |
+| Pause | Esc / F5 | Start |
 
-## Track architecture
+Test Drive and races now use the same pause contract. Pausing preserves the active driving mode and offers Resume, Restart Event where applicable, Return to Builder for Test Drive, and Main Menu. Esc/Start no longer abandons a race or Test Drive directly.
 
-`TrackData` is the source of truth. Rendering, validation, AI, race progress, serialization, procedural generation, sharing and undo/redo consume the same model. The visual road layer is deliberately not authoritative.
+## Save locations
 
-Saved tracks live under:
+Saved tracks:
 
 ```text
 user://tracks/<track_id>/track.json
 ```
 
-Track packages are exported under:
+Portable track packages:
 
 ```text
-user://track_exports/<track_name>_<track_id>/
-    track.json
-    metadata.json
-    preview.png        # when available
+user://track_exports/*.pixeltrack
 ```
 
-Best ghosts live under:
+Best ghosts:
 
 ```text
 user://ghosts/<track_id>/<vehicle>_<mode>.json
 ```
 
-## Automated validation
+Garage, Career, settings, input bindings, records, and dialogue state use persistent `user://` storage with atomic or recovery-aware handling where applicable.
 
-The GitHub Actions workflow downloads the official **Godot 4.7.1** binary and export templates.
+## Automated validation and Windows package
 
-The exact PR head is gated by:
+GitHub Actions uses the official **Godot 4.7.1** binary and matching export templates. The exact PR head is gated by:
 
 ```text
-Godot headless import/parser
-→ core regressions
-→ race-position/finish-order regressions
+release metadata consistency
+→ project import/parser/script-load gate
+→ core, migration, race, presentation, generation, sharing, save, ghost, asset, theme, team, audio, polish, drift, profile, dialogue, release-readiness, and controller suites
 → deterministic large-track / 12-racer stress tests
-→ Windows release export
-→ ZIP integrity/content verification
-→ SHA-256 checksum
-→ workflow artifact upload
+→ Windows x64 release export
+→ versioned bundle manifest and exact-content validation
+→ ZIP integrity and SHA-256 verification
+→ normal packaged Windows boot
+→ packaged persistence/ghost/recovery/.pixeltrack self-test
 ```
 
-Local commands with Godot available:
+The development artifact is versioned from `project.godot`:
+
+```text
+PixelTrackWorks-0.9.0-dev.1-Windows-x64.zip
+PixelTrackWorks-0.9.0-dev.1-Windows-x64.zip.sha256
+```
+
+The ZIP contains the executable, version, release manifest, README, quick start, release notes, and asset attribution. A repository `LICENSE` is included automatically when one exists; no license text is invented by the build.
+
+The packaged self-test runs inside the exported executable on a fresh Windows runner and verifies writable track persistence, generated-track validation, ghost persistence, backup recovery after deliberate corruption, preview generation, `.pixeltrack` export/inspection/import, duplicate-ID handling, and cleanup.
+
+Local examples with Godot available:
 
 ```bash
 godot --headless --path . --script res://tests/run_tests.gd
-godot --headless --path . --script res://tests/run_race_progress_tests.gd
+godot --headless --path . --script res://tests/run_release_readiness_tests.gd
+godot --headless --path . res://tests/controller_audit_runner.tscn
 godot --headless --path . --script res://tests/run_stress_tests.gd
 ```
 
-The stress suite covers 60 generated tracks across Circuit/Mixed/Rally styles, a 96×96 large track, 12-racer AI path setup, 100 serialization round trips and large preview rendering.
+## What still blocks production V1.0
 
-## What still separates this branch from a production V1.0
+The project is a broad playable pre-release, not a certified production `1.0.0`. Remaining release gates are:
 
-Core architecture is largely implemented. Remaining release work is concentrated in:
+- Commit, measure, slice, map, and visibly integrate the actual supplied body/head/portrait source sheets.
+- Validate the character-to-car, dialogue, portrait, race-radio, and packaged venue presentation using those real files.
+- Complete physical Xbox/XInput, PlayStation-style, and generic DirectInput controller audits.
+- Complete UI scale, large-text, 720p/1080p/1440p, and high-DPI visual matrices.
+- Profile a packaged 12-car 1080p race against the stable 60 FPS target.
+- Playtest representative light, heavy, bike, rally, and high-performance vehicle handling/collision shapes.
+- Complete manual drift exploit/feel tuning and the full audio/music/ambience fatigue mix.
+- Complete clean-machine launch and full application-restart persistence/migration/import/export certification.
+- Resolve and document the applicable Wheels in Pixels usage terms without assuming they match the other supplied packs.
 
-- deeper use of the bundled track/decor sprite sheets;
-- larger environment/decor content palette;
-- engine/tire/impact/nitro/UI audio and music;
-- crowd/environment ambience and richer crash feedback;
-- manual multi-car contact/overtaking tuning;
-- manual 12-car runtime FPS profiling on target Windows hardware;
-- full controller-focus, large-text, UI-scale and high-DPI visual QA;
-- clean-machine save/import/export/ghost persistence testing;
-- final versioning, release notes and distribution packaging.
+PR #1 remains draft and unmerged until the genuine automated and manual release requirements are satisfied. See `docs/IMPLEMENTATION_STATUS.md` and `docs/V1_RELEASE_GATE.md` for the detailed status and release contract.
 
-See `docs/IMPLEMENTATION_STATUS.md` for the phase-by-phase status.
+## Repository preservation
 
-## Repository note
-
-The existing web files (`index.html`, `js/config`, `js/core`), manifests, vehicle catalog and original asset directories are intentionally preserved. The Godot implementation reuses them rather than deleting or rewriting that work.
+The existing web files (`index.html`, `js/config`, `js/core`), manifests, source asset directories, and authored vehicle catalog remain intentionally preserved. The Godot implementation consumes and normalizes that work rather than deleting it or storing raw source filenames/atlas coordinates in player saves.
