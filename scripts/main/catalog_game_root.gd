@@ -1,6 +1,7 @@
 extends "res://scripts/main/game_root.gd"
 
 var visual_themes := VisualThemeCatalog.new()
+var catalog_palette: CatalogBuilderPalette = null
 
 func _create_world() -> void:
 	renderer = CatalogTrackRenderer.new()
@@ -24,6 +25,13 @@ func _create_world() -> void:
 	builder.save_requested.connect(save_current_track)
 	builder.load_requested.connect(_on_builder_load_requested)
 	builder.tool_changed.connect(_on_tool_changed)
+	var catalog_builder := builder as CatalogBuilderController
+	if catalog_builder != null:
+		catalog_builder.theme_cycle_requested.connect(cycle_visual_theme)
+	catalog_palette = CatalogBuilderPalette.new()
+	catalog_palette.name = "CatalogBuilderPalette"
+	add_child(catalog_palette)
+	catalog_palette.setup(self)
 
 func current_visual_theme_id() -> String:
 	var themed_renderer := renderer as CatalogTrackRenderer
