@@ -81,7 +81,7 @@ func _test_runtime_focusability() -> void:
 		runtime_ui.open_settings()
 		await get_tree().process_frame
 		_expect(_find_label_by_text(runtime_ui, "Pause") != null, "settings exposes pause rebinding")
-		_expect(_find_label_by_text(runtime_ui, "Builder test") != null, "settings exposes contextual Builder Test rebinding")
+		_expect(_find_label_by_text(runtime_ui, "Builder Test") != null, "settings exposes contextual Builder Test rebinding")
 	_audit_focus(instance)
 	if runtime_ui != null:
 		runtime_ui.call("_clear_modal")
