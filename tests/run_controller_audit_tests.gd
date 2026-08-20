@@ -1,8 +1,8 @@
-extends SceneTree
+extends Node
 
 var failures := 0
 
-func _init() -> void:
+func _ready() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
@@ -10,10 +10,10 @@ func _run() -> void:
 	await _test_runtime_focusability()
 	if failures == 0:
 		print("Pixel Track Works controller audit tests: PASS")
-		quit(0)
+		get_tree().quit(0)
 	else:
 		push_error("Pixel Track Works controller audit tests: %d failure(s)" % failures)
-		quit(1)
+		get_tree().quit(1)
 
 func _test_gamepad_action_coverage() -> void:
 	var required: Array[StringName] = [
@@ -45,12 +45,12 @@ func _test_runtime_focusability() -> void:
 	if scene == null:
 		return
 	var instance := scene.instantiate()
-	root.add_child(instance)
-	await process_frame
-	await process_frame
+	add_child(instance)
+	await get_tree().process_frame
+	await get_tree().process_frame
 	_audit_focus(instance)
 	instance.queue_free()
-	await process_frame
+	await get_tree().process_frame
 
 func _audit_focus(node: Node) -> void:
 	if node is Button or node is OptionButton or node is SpinBox or node is HSlider or node is VSlider or node is LineEdit or node is CheckBox:
