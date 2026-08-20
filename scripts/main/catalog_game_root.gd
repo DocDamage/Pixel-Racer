@@ -3,6 +3,8 @@ extends "res://scripts/main/game_root.gd"
 var visual_themes := VisualThemeCatalog.new()
 var race_team_assignment := RaceTeamAssignment.new()
 var catalog_palette: CatalogBuilderPalette = null
+var mode_transition: ModeTransitionOverlay = null
+var _last_builder_sfx_ms := 0
 
 func _create_world() -> void:
 	renderer = CatalogTrackRenderer.new()
@@ -29,15 +31,37 @@ func _create_world() -> void:
 	var catalog_builder := builder as CatalogBuilderController
 	if catalog_builder != null:
 		catalog_builder.theme_cycle_requested.connect(cycle_visual_theme)
+		catalog_builder.edit_committed.connect(_on_builder_edit_committed)
 	catalog_palette = CatalogBuilderPalette.new()
 	catalog_palette.name = "CatalogBuilderPalette"
 	add_child(catalog_palette)
 	catalog_palette.setup(self)
+	mode_transition = ModeTransitionOverlay.new()
+	mode_transition.name = "ModeTransitionOverlay"
+	add_child(mode_transition)
 
 func _spawn_ai(count: int) -> void:
 	super._spawn_ai(count)
 	for index in range(ai_vehicles.size()):
 		race_team_assignment.apply_to_vehicle(ai_vehicles[index], index)
+
+func save_current_track() -> bool:
+	var saved: bool = super.save_current_track()
+	var sfx := get_node_or_null("GameSFX") as GameSFXController
+	if sfx != null:
+		if saved:
+			sfx.play_save()
+		else:
+			sfx.play_invalid()
+	return saved
+
+func start_event(mode: String = "circuit", laps_override: int = 0, ai_override: int = -1, championship_id: String = "") -> bool:
+	var started: bool = super.start_event(mode, laps_override, ai_override, championship_id)
+	if not started:
+		var sfx := get_node_or_null("GameSFX") as GameSFXController
+		if sfx != null:
+			sfx.play_invalid()
+	return started
 
 func current_visual_theme_id() -> String:
 	var themed_renderer := renderer as CatalogTrackRenderer
@@ -67,3 +91,12 @@ func cycle_visual_theme(direction: int = 1) -> void:
 	if index < 0:
 		index = 0
 	set_visual_theme(ids[posmod(index + direction, ids.size())])
+
+func _on_builder_edit_committed() -> void:
+	var now_ms: int = Time.get_ticks_msec()
+	if now_ms - _last_builder_sfx_ms < 85:
+		return
+	_last_builder_sfx_ms = now_ms
+	var sfx := get_node_or_null("GameSFX") as GameSFXController
+	if sfx != null:
+		sfx.play_builder_place()
