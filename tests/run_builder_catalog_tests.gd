@@ -10,10 +10,10 @@ func _init() -> void:
 	_finish()
 
 func _test_logical_catalog_placement_round_trip() -> void:
-	var track = TrackDataScript.new()
+	var track: TrackData = TrackDataScript.new()
 	track.width = 16
 	track.height = 16
-	var builder = CatalogBuilderScript.new()
+	var builder: CatalogBuilderController = CatalogBuilderScript.new()
 	builder.track = track
 	builder.cursor_cell = Vector2i(4, 5)
 	_expect(builder.select_catalog_asset("prop.tree.craftpix_01"), "builder selects logical catalog asset")
@@ -25,7 +25,7 @@ func _test_logical_catalog_placement_round_trip() -> void:
 	builder.eyedropper()
 	_expect(builder.selected_catalog_asset == "prop.tree.craftpix_01", "eyedropper restores exact logical catalog asset")
 	var payload: Dictionary = track.to_dict()
-	var restored = TrackDataScript.new()
+	var restored: TrackData = TrackDataScript.new()
 	restored.from_dict(payload)
 	_expect(restored.objects.size() == 1, "catalog object survives track serialization")
 	if restored.objects.size() == 1:
