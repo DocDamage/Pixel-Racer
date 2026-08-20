@@ -69,6 +69,10 @@ jobs:
         run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path . --script res://tests/run_asset_sprite_tests.gd
       - name: Run runtime asset hazard tests
         run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path . --script res://tests/run_asset_hazard_tests.gd
+      - name: Run builder catalog placement tests
+        run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path . --script res://tests/run_builder_catalog_tests.gd
+      - name: Run asset gallery smoke tests
+        run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path . --script res://tests/run_asset_gallery_tests.gd
       - name: Run deterministic stress tests
         run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path . --script res://tests/run_stress_tests.gd
 
