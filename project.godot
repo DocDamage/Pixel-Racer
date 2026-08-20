@@ -15,6 +15,81 @@ SaveManager="*res://autoload/save_manager.gd"
 SettingsManager="*res://autoload/settings_manager.gd"
 InputManager="*res://autoload/input_manager.gd"
 
+[input]
+
+accelerate={
+"deadzone": 0.2,
+"events": []
+}
+brake={
+"deadzone": 0.2,
+"events": []
+}
+steer_left={
+"deadzone": 0.2,
+"events": []
+}
+steer_right={
+"deadzone": 0.2,
+"events": []
+}
+handbrake={
+"deadzone": 0.2,
+"events": []
+}
+boost={
+"deadzone": 0.2,
+"events": []
+}
+reset_vehicle={
+"deadzone": 0.2,
+"events": []
+}
+pause={
+"deadzone": 0.2,
+"events": []
+}
+toggle_test={
+"deadzone": 0.2,
+"events": []
+}
+builder_undo={
+"deadzone": 0.2,
+"events": []
+}
+builder_redo={
+"deadzone": 0.2,
+"events": []
+}
+builder_save={
+"deadzone": 0.2,
+"events": []
+}
+builder_load={
+"deadzone": 0.2,
+"events": []
+}
+builder_next_tool={
+"deadzone": 0.2,
+"events": []
+}
+builder_prev_tool={
+"deadzone": 0.2,
+"events": []
+}
+builder_place={
+"deadzone": 0.2,
+"events": []
+}
+builder_erase={
+"deadzone": 0.2,
+"events": []
+}
+builder_eyedropper={
+"deadzone": 0.2,
+"events": []
+}
+
 [display]
 window/size/viewport_width=640
 window/size/viewport_height=360
