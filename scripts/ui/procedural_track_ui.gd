@@ -144,6 +144,7 @@ func _build() -> void:
 	style_select.item_selected.connect(func(_index: int): _refresh_summary())
 	box.add_child(_labeled_row("Style", style_select))
 	size_spin = SpinBox.new()
+	size_spin.focus_mode = Control.FOCUS_ALL
 	size_spin.min_value = 24
 	size_spin.max_value = 96
 	size_spin.step = 4
@@ -173,6 +174,7 @@ func _build() -> void:
 	scenery_slider.value_changed.connect(_refresh_summary)
 	box.add_child(_labeled_row("Scenery", scenery_slider))
 	seed_spin = SpinBox.new()
+	seed_spin.focus_mode = Control.FOCUS_ALL
 	seed_spin.min_value = 1
 	seed_spin.max_value = 2147483000
 	seed_spin.step = 1
