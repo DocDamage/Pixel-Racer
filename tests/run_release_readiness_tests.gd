@@ -21,6 +21,8 @@ func _test_release_report_is_explicit() -> void:
 		if blocker is Dictionary:
 			ids.append(str((blocker as Dictionary).get("id", "")))
 	_expect("character_assets" in ids, "missing unmeasured character atlas remains an explicit release blocker")
+	_expect("application_version" not in ids, "pre-release application version is explicitly set")
+	_expect(ids.size() == 1 and "character_assets" in ids, "character source completion is the sole automated release blocker")
 	_expect(not bool(report.get("production_ready", true)), "current incomplete manual/character state cannot report production-ready")
 	_expect(Array(report.get("pending_manual_checks", [])).size() == ReleaseReadiness.MANUAL_CHECKS.size(), "all manual QA checks begin pending")
 	for action in ReleaseReadiness.ESSENTIAL_INPUT_ACTIONS:
