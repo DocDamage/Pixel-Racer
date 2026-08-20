@@ -3,6 +3,7 @@ class_name CatalogBuilderController
 
 signal catalog_asset_changed(asset_id: String, display_name: String)
 signal theme_cycle_requested(direction: int)
+signal edit_committed
 
 var asset_catalog := BuilderAssetCatalog.new()
 var selected_catalog_asset := ""
@@ -83,6 +84,10 @@ func _place_current() -> void:
 	track.add_object(selected_catalog_asset, cursor_cell, barrier_rotation)
 	_last_painted = cursor_cell
 	_after_edit()
+
+func _after_edit() -> void:
+	super._after_edit()
+	edit_committed.emit()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if enabled:
