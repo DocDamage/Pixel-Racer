@@ -77,6 +77,8 @@ jobs:
         run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path . --script res://tests/run_visual_theme_tests.gd
       - name: Run team presentation tests
         run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path . --script res://tests/run_team_presentation_tests.gd
+      - name: Run audio integration tests
+        run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path . --script res://tests/run_audio_integration_tests.gd
       - name: Run deterministic stress tests
         run: /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 --headless --path . --script res://tests/run_stress_tests.gd
 
