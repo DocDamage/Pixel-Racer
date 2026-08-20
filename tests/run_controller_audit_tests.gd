@@ -48,7 +48,28 @@ func _test_runtime_focusability() -> void:
 	add_child(instance)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	var runtime_ui := instance.get("ui") as GameUI
+	_expect(runtime_ui is CatalogGameUI, "catalog runtime uses the modern library UI")
+	if runtime_ui != null:
+		runtime_ui.open_track_library()
+		await get_tree().process_frame
+		var modern_share := _find_button_by_text(runtime_ui, "SHARE / IMPORT .PIXELTRACK")
+		_expect(modern_share != null, "track library routes sharing through the portable package workflow")
+		_expect(_find_button_by_text(runtime_ui, "IMPORT JSON") == null, "legacy JSON import button is absent")
+		_expect(_find_button_by_text(runtime_ui, "EXPORT CURRENT") == null, "legacy direct-export button is absent")
+		if modern_share != null:
+			modern_share.pressed.emit()
+			await get_tree().process_frame
+			await get_tree().process_frame
+	var sharing := instance.get_node_or_null("TrackSharingUI")
+	_expect(sharing != null, "main runtime includes the track sharing panel")
+	if sharing != null:
+		_expect(sharing.has_method("is_panel_open"), "track sharing panel exposes a stable open-state contract")
+		if sharing.has_method("is_panel_open"):
+			_expect(bool(sharing.call("is_panel_open")), "modern track sharing panel opens from Track Library")
 	_audit_focus(instance)
+	if sharing != null and sharing.has_method("close_panel"):
+		sharing.call("close_panel")
 	var pause_controller := instance.get_node_or_null("PauseController")
 	_expect(pause_controller != null, "main runtime includes the pause controller")
 	if pause_controller != null:
@@ -63,6 +84,15 @@ func _test_runtime_focusability() -> void:
 		get_tree().paused = false
 	instance.queue_free()
 	await get_tree().process_frame
+
+func _find_button_by_text(node: Node, text_value: String) -> Button:
+	if node is Button and (node as Button).text == text_value:
+		return node as Button
+	for child in node.get_children():
+		var found := _find_button_by_text(child, text_value)
+		if found != null:
+			return found
+	return null
 
 func _audit_focus(node: Node) -> void:
 	if node is Button or node is OptionButton or node is SpinBox or node is HSlider or node is VSlider or node is LineEdit or node is CheckBox:

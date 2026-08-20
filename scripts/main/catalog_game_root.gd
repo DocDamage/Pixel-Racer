@@ -6,6 +6,16 @@ var catalog_palette: CatalogBuilderPalette = null
 var mode_transition: ModeTransitionOverlay = null
 var _last_builder_sfx_ms := 0
 
+func _ready() -> void:
+	career.load_profile()
+	_create_world()
+	ui = CatalogGameUI.new()
+	ui.name = "GameUI"
+	add_child(ui)
+	ui.setup(self)
+	set_track(ProceduralTrackGenerator.new().create_demo_track(), true)
+	show_menu()
+
 func _create_world() -> void:
 	renderer = CatalogTrackRenderer.new()
 	renderer.name = "TrackRenderer"
@@ -39,6 +49,13 @@ func _create_world() -> void:
 	mode_transition = ModeTransitionOverlay.new()
 	mode_transition.name = "ModeTransitionOverlay"
 	add_child(mode_transition)
+
+func open_track_sharing() -> bool:
+	var sharing := get_node_or_null("TrackSharingUI")
+	if sharing == null or not sharing.has_method("open_panel"):
+		return false
+	sharing.call("open_panel")
+	return bool(sharing.call("is_panel_open"))
 
 func _spawn_ai(count: int) -> void:
 	super._spawn_ai(count)
