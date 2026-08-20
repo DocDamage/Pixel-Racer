@@ -1,6 +1,7 @@
 extends "res://scripts/main/game_root.gd"
 
 var visual_themes := VisualThemeCatalog.new()
+var race_team_assignment := RaceTeamAssignment.new()
 var catalog_palette: CatalogBuilderPalette = null
 
 func _create_world() -> void:
@@ -32,6 +33,11 @@ func _create_world() -> void:
 	catalog_palette.name = "CatalogBuilderPalette"
 	add_child(catalog_palette)
 	catalog_palette.setup(self)
+
+func _spawn_ai(count: int) -> void:
+	super._spawn_ai(count)
+	for index in range(ai_vehicles.size()):
+		race_team_assignment.apply_to_vehicle(ai_vehicles[index], index)
 
 func current_visual_theme_id() -> String:
 	var themed_renderer := renderer as CatalogTrackRenderer
