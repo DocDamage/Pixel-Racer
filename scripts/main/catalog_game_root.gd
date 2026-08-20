@@ -16,6 +16,19 @@ func _ready() -> void:
 	set_track(ProceduralTrackGenerator.new().create_demo_track(), true)
 	show_menu()
 
+func _process(delta: float) -> void:
+	if player != null and is_instance_valid(player) and GameState.current_mode in [GameState.MODE_TEST, GameState.MODE_RACE]:
+		var lookahead := player.velocity * 0.18
+		camera.position = camera.position.lerp(player.global_position + lookahead, clampf(delta * 6.0, 0.0, 1.0))
+		_apply_camera_feedback(delta)
+		ghost.capture(delta, player)
+		if GameState.current_mode == GameState.MODE_RACE and race_progress != null:
+			race_progress.update()
+		if ui != null:
+			ui.update_race_hud(race_state())
+	elif camera != null:
+		camera.offset = camera.offset.lerp(Vector2.ZERO, clampf(delta * 12.0, 0.0, 1.0))
+
 func _create_world() -> void:
 	renderer = CatalogTrackRenderer.new()
 	renderer.name = "TrackRenderer"

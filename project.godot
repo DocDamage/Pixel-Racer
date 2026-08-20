@@ -54,6 +54,10 @@ toggle_test={
 "deadzone": 0.2,
 "events": []
 }
+builder_test={
+"deadzone": 0.2,
+"events": []
+}
 builder_undo={
 "deadzone": 0.2,
 "events": []

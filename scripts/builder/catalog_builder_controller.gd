@@ -74,6 +74,11 @@ func eyedropper() -> void:
 	clear_catalog_asset()
 	super.eyedropper()
 
+func _process(delta: float) -> void:
+	super._process(delta)
+	if enabled and Input.is_action_just_pressed("builder_test"):
+		test_requested.emit()
+
 func _place_current() -> void:
 	if selected_catalog_asset.is_empty():
 		super._place_current()
